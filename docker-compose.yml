@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: nest-portfolio-backend
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/portfolio
+      JWT_SECRET: dev-secret # à changer en prod
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run start:dev # hot reload en dev
+
+  db:
+    image: postgres:15
+    container_name: nest-portfolio-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: portfolio
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
