@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
 }
 
 enum MediaType {
@@ -45,15 +46,17 @@ model User {
 /* ---------------- PROJECTS ---------------- */
 
 model Project {
-  id          String    @id @default(cuid())
-  date        DateTime
-  isVisible   Boolean
-  gitUrl      String?
-  visitUrl    String?
-  media       Media[]
-  techTags    Tag[]     @relation("ProjectTechTags")
-  qualTags    Tag[]     @relation("ProjectQualTags")
-  translations ProjectTranslation[]
+  id            String               @id @default(cuid())
+  date          DateTime
+  isVisible     Boolean
+  gitUrl        String?
+  visitUrl      String?
+  playUrl       String?
+  logoUrl       String?
+  media         Media[]
+  techTags      Tag[]                @relation("ProjectTechTags")
+  qualTags      Tag[]                @relation("ProjectQualTags")
+  translations  ProjectTranslation[]
 }
 
 model ProjectTranslation {
@@ -61,7 +64,8 @@ model ProjectTranslation {
   locale      Locale
   name        String
   description String
-  project     Project  @relation(fields: [projectId], references: [id])
+  type        String?
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
 
   @@unique([projectId, locale])
@@ -70,24 +74,26 @@ model ProjectTranslation {
 /* ---------------- MEDIA ---------------- */
 
 model Media {
-  id        String   @id @default(cuid())
-  mediaUrl  String
-  type      MediaType
-  project   Project? @relation(fields: [projectId], references: [id])
-  projectId String?
+  id           String    @id @default(cuid())
+  mediaUrl     String
+  type         MediaType
+  originalName String?
+  mimeType     String?
+  project      Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String?
 }
 
 /* ---------------- TAGS ---------------- */
 
 model Tag {
-  id             String        @id @default(cuid())
+  id             String            @id @default(cuid())
   type           TagType
   isVisible      Boolean
   hexColor       String
-  projectsAsTech Project[]     @relation("ProjectTechTags")
-  projectsAsQual Project[]     @relation("ProjectQualTags")
-  skills         Skill[]       @relation("SkillTags")
-  experiences    Experience[]  @relation("ExperienceTags")
+  projectsAsTech Project[]         @relation("ProjectTechTags")
+  projectsAsQual Project[]         @relation("ProjectQualTags")
+  skills         Skill[]           @relation("SkillTags")
+  experiences    Experience[]      @relation("ExperienceTags")
   translations   TagTranslation[]
 }
 
@@ -95,7 +101,7 @@ model TagTranslation {
   id      String @id @default(cuid())
   locale  Locale
   name    String
-  tag     Tag    @relation(fields: [tagId], references: [id])
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
   tagId   String
 
   @@unique([tagId, locale])
@@ -117,7 +123,7 @@ model SkillTranslation {
   id        String @id @default(cuid())
   locale    Locale
   name      String
-  skill     Skill  @relation(fields: [skillId], references: [id])
+  skill     Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
   skillId   String
 
   @@unique([skillId, locale])
@@ -126,17 +132,17 @@ model SkillTranslation {
 /* ---------------- SKILL CATEGORIES ---------------- */
 
 model SkillCategory {
-  id           String               @id @default(cuid())
+  id           String                     @id @default(cuid())
   isVisible    Boolean
-  skills       Skill[]              @relation("SkillToCategory")
+  skills       Skill[]                    @relation("SkillToCategory")
   translations SkillCategoryTranslation[]
 }
 
 model SkillCategoryTranslation {
-  id               String         @id @default(cuid())
+  id               String        @id @default(cuid())
   locale           Locale
   name             String
-  skillCategory    SkillCategory  @relation(fields: [skillCategoryId], references: [id])
+  skillCategory    SkillCategory @relation(fields: [skillCategoryId], references: [id], onDelete: Cascade)
   skillCategoryId  String
 
   @@unique([skillCategoryId, locale])
@@ -152,17 +158,19 @@ model Experience {
   localisation String
   isVisible    Boolean
   siteUrl      String?
+  imageUrl     String?
+  order        Int          @default(0)
   tags         Tag[]        @relation("ExperienceTags")
   translations ExperienceTranslation[]
+  companyName  String
 }
 
 model ExperienceTranslation {
   id           String     @id @default(cuid())
   locale       Locale
   jobTitle     String
-  companyName  String
   description  String
-  experience   Experience @relation(fields: [experienceId], references: [id])
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
   experienceId String
 
   @@unique([experienceId, locale])
@@ -175,31 +183,54 @@ model Contact {
   contactUrl   String
   imageUrl     String
   isVisible    Boolean
+  cssSize      String?
   translations ContactTranslation[]
 }
 
 model ContactTranslation {
   id         String   @id @default(cuid())
   locale     Locale
-  text       String
-  contact    Contact  @relation(fields: [contactId], references: [id])
+  name       String
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   contactId  String
 
   @@unique([contactId, locale])
 }
 
+/* ---------------- PROFILE ---------------- */
+
+model Profile {
+  id           String               @id @default(cuid())
+  name         String               @default("")
+  updatedAt    DateTime             @updatedAt
+  translations ProfileTranslation[]
+}
+
+model ProfileTranslation {
+  id          String  @id @default(cuid())
+  locale      Locale
+  greeting    String  @default("")
+  profession  String  @default("")
+  description String  @default("")
+  skillsTitle String  @default("")
+  profile     Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId   String
+
+  @@unique([profileId, locale])
+}
+
 /* ---------------- RESUME ---------------- */
 
 model Resume {
-  id        String   @id @default(cuid())
-  updatedAt DateTime @updatedAt
+  id           String              @id @default(cuid())
+  updatedAt    DateTime            @updatedAt
   translations ResumeTranslation[]
 }
 
 model ResumeTranslation {
-  id         String   @id @default(cuid())
-  locale     Locale
-  url        String
-  resume     Resume   @relation(fields: [resumeId], references: [id])
-  resumeId   String
+  id       String  @id @default(cuid())
+  locale   Locale
+  url      String
+  resume   Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  resumeId String
 }
