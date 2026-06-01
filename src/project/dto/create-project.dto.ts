@@ -1,39 +1,72 @@
+import { Locale } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
-  IsString,
-  IsOptional,
-  IsArray,
-  IsDateString,
-  IsUrl,
+    IsArray,
+    IsBoolean,
+    IsDateString,
+    IsEnum,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    IsUrl,
+    ValidateNested,
 } from 'class-validator';
 
 export class CreateProjectDto {
-  @IsString()
-  name: string;
+    @IsDateString()
+    date: string;
 
-  @IsString()
-  description: string;
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    gitUrl?: string;
 
-  @IsDateString()
-  date: string; // ISO string, ex: "2024-06-05T12:00:00Z"
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    visitUrl?: string;
 
-  @IsOptional()
-  @IsUrl()
-  gitUrl?: string;
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    playUrl?: string;
 
-  @IsOptional()
-  @IsUrl()
-  visitUrl?: string;
+    @IsOptional()
+    @IsString()
+    logoUrl?: string;
 
-  @IsOptional()
-  @IsArray()
-  @IsUrl({}, { each: true })
-  mediaUrls?: string[]; // Les URL vers des images ou vidéos
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    mediaIds?: string[];
 
-  @IsArray()
-  @IsString({ each: true })
-  techTagIds: string[];
+    @IsArray()
+    @IsString({ each: true })
+    techTagIds: string[];
 
-  @IsArray()
-  @IsString({ each: true })
-  qualTagIds: string[];
+    @IsArray()
+    @IsString({ each: true })
+    qualTagIds: string[];
+
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreateProjectTranslationDto)
+    translations: CreateProjectTranslationDto[];
+
+    @IsBoolean()
+    isVisible: boolean;
+}
+
+export class CreateProjectTranslationDto {
+    @IsEnum(Locale)
+    locale: Locale;
+
+    @IsString()
+    @IsNotEmpty()
+    name: string;
+
+    @IsString()
+    @IsNotEmpty()
+    description: string;
+
+    @IsOptional()
+    @IsString()
+    type?: string;
 }

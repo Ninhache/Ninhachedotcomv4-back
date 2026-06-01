@@ -1,5 +1,5 @@
 import { Media } from 'src/media/entities/media.entity';
-import { Tag } from 'src/tag/entities/tag.entity';
+import { Tag } from 'src/tags/entities/tag.entity';
 
 export class Project {
   id: string;
