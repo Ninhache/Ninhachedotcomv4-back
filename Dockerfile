@@ -18,6 +18,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 
+RUN mkdir -p /app/uploads
+
 ENV NODE_ENV=production
 
 CMD ["node", "dist/main"]
