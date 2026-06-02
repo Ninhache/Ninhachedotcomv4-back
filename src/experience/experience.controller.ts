@@ -72,7 +72,8 @@ export class ExperienceController {
 
     @Delete(':id')
     @HttpCode(204)
-    async remove(@Param('id') id: string) {
-        return await this.experienceService.remove(id);
+    async remove(@Param('id') id: string): Promise<void> {
+        // 204 No Content — must not return a body.
+        await this.experienceService.remove(id);
     }
 }
