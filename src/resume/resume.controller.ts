@@ -11,6 +11,7 @@ import { ApiBody, ApiConsumes, ApiOkResponse } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { ResumeDto } from './dto/resume.dto';
 import { ResumeService } from './resume.service';
 
@@ -24,6 +25,7 @@ const uploadStorage = diskStorage({
     },
 });
 
+@RevalidateContent('resume')
 @Controller('resume')
 export class ResumeController {
     constructor(private readonly resumeService: ResumeService) {}
