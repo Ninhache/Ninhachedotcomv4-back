@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Backend + admin API for the `ninhache.com` V4 portfolio (NestJS 10 + Prisma 6 + PostgreSQL). The public frontend lives in a separate repo (`Ninhachedotcomv4-seo`) and consumes the public (`@Public()`) endpoints here with ISR-style revalidation; the rest of the surface is the authenticated admin CRUD used to manage portfolio content.
+Backend + admin API for the `ninhache.com` V4 portfolio (NestJS 11 + Prisma 6 + PostgreSQL). The public frontend lives in a separate repo (`Ninhachedotcomv4-seo`) and consumes the public (`@Public()`) endpoints here with ISR-style revalidation; the rest of the surface is the authenticated admin CRUD used to manage portfolio content.
 
 ## Commands
 
