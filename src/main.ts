@@ -1,3 +1,7 @@
+// Load .env into process.env BEFORE env validation runs — ConfigModule only
+// loads it during NestFactory.create (after validateEnvironmentVariables()),
+// so without this the .env-based dev/docker workflow would fail validation.
+import 'dotenv/config';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory, NestApplication } from '@nestjs/core';
 import { plainToInstance } from 'class-transformer';
