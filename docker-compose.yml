@@ -5,12 +5,18 @@ services:
     build: .
     container_name: nest-portfolio-backend
     ports:
-      - '8080:3000'
+      # host:container — container listens on APP_PORT (from .env, default 5000)
+      - '8080:5000'
     depends_on:
       - db
+    # All required env vars (JWT_SECRET, ADMIN_PWD, FRONT_URL, REVALIDATE_SECRET,
+    # TRUSTED_ORIGINS, APP_PORT, ...) come from .env so boot-time validation passes.
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5433/portfolio
-      JWT_SECRET: dev-secret # à changer en prod
+      # Override .env's host-oriented URL: inside the compose network Postgres
+      # listens on 5432 (the 5433:5432 mapping below only affects the host).
+      DATABASE_URL: postgres://postgres:postgres@db:5432/portfolio
     volumes:
       - .:/app
       - /app/node_modules
