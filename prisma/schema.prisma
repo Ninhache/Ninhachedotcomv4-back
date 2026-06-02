@@ -235,3 +235,23 @@ model ResumeTranslation {
   resume   Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   resumeId String
 }
+
+/* ---------------- ALIAS (dynamic, per-locale JS bodies) ---------------- */
+
+model Alias {
+  id        String      @id @default(cuid())
+  key       String      @unique // "age", "example", "greeting", "email"
+  bodies    AliasBody[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model AliasBody {
+  id      String @id @default(cuid())
+  aliasId String
+  locale  String // "fr", "en" — kept as String per the alias spec
+  code    String // JS, last line = return
+  alias   Alias  @relation(fields: [aliasId], references: [id], onDelete: Cascade)
+
+  @@unique([aliasId, locale])
+}

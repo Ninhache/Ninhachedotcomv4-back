@@ -115,6 +115,8 @@ async function main() {
     await prisma.skillCategory.deleteMany();
     await prisma.contact.deleteMany();
     await prisma.profile.deleteMany();
+    await prisma.aliasBody.deleteMany();
+    await prisma.alias.deleteMany();
     await prisma.tag.deleteMany();
 
     const projects = readJson<JsonProject[]>(path.join(FRONTEND_PATH, 'jsons/projects.json'));
@@ -366,6 +368,51 @@ async function main() {
     });
 
     console.log('✅ Created profile');
+
+    // ── 6. Aliases (dynamic, per-locale JS bodies executed in a sandbox) ─────────
+
+    // age — pure, computed from a date
+    const ageBody =
+        "return Math.floor((Date.now() - new Date('2002-05-12')) / 3.15576e10);";
+    // example — alias inside alias
+    const exampleBody = 'return $.age % 4;';
+    // greeting fr / en — bucket logic lives IN the body (Europe/Paris)
+    // NOTE: deviation from the plan — the plan used 'fr-FR' here, but fr-FR
+    // formats a lone hour as "09 h" so `+"09 h"` is NaN (greeting always wrong).
+    // The hour is locale-neutral, so we read it with 'en-GB' (bare "09"); only
+    // the greeting words stay French.
+    const greetFr =
+        "const h=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hour12:false,timeZone:'Europe/Paris'}).format(new Date()); return ['Bonsoir','Bonjour','Bon apres-midi','Bonsoir'][h<6?0:h<12?1:h<18?2:3];";
+    const greetEn =
+        "const h=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hour12:false,timeZone:'Europe/Paris'}).format(new Date()); return ['Good evening','Good morning','Good afternoon','Good evening'][h<6?0:h<12?1:h<18?2:3];";
+    // email — fixed text = just a return
+    const emailBody = "return 'moi@exemple.fr';";
+    // projectCount — uses a FEED (resolved host-side, injected into $)
+    const projCountBody = 'return String($.projectCount);';
+
+    const aliasSeed: { key: string; bodies: { fr: string; en: string } }[] = [
+        { key: 'age', bodies: { fr: ageBody, en: ageBody } },
+        { key: 'example', bodies: { fr: exampleBody, en: exampleBody } },
+        { key: 'greeting', bodies: { fr: greetFr, en: greetEn } },
+        { key: 'email', bodies: { fr: emailBody, en: emailBody } },
+        { key: 'projectCount', bodies: { fr: projCountBody, en: projCountBody } },
+    ];
+
+    for (const a of aliasSeed) {
+        await prisma.alias.create({
+            data: {
+                key: a.key,
+                bodies: {
+                    create: [
+                        { locale: Locale.fr, code: a.bodies.fr },
+                        { locale: Locale.en, code: a.bodies.en },
+                    ],
+                },
+            },
+        });
+    }
+
+    console.log(`✅ Created ${aliasSeed.length} aliases`);
     console.log('🎉 Seed complete!');
 }
 
