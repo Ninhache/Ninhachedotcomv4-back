@@ -7,19 +7,26 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     Res,
-    UseGuards,
 } from '@nestjs/common';
+import { AliasService } from 'src/alias/alias.service';
+import { isRaw } from 'src/alias/raw';
 import { Public } from 'src/auth/public.decorator';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { CreateExperienceDto } from './dto/create-experience.dto';
 import { UpdateExperienceDto } from './dto/update-experience.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { ExperienceService } from './experience.service';
 import type { Response } from 'express';
 
+@RevalidateContent('experiences')
 @Controller('experiences')
 export class ExperienceController {
-    constructor(private readonly experienceService: ExperienceService) {}
+    constructor(
+        private readonly experienceService: ExperienceService,
+        private readonly alias: AliasService
+    ) {}
 
     @Post()
     async create(
@@ -35,8 +42,11 @@ export class ExperienceController {
 
     @Public()
     @Get()
-    async findAll() {
-        return this.experienceService.findAll();
+    async findAll(@Query('locale') locale = 'fr', @Query('raw') raw?: string) {
+        const experiences = await this.experienceService.findAll();
+        return isRaw(raw)
+            ? experiences
+            : this.alias.resolveObject(experiences, locale);
     }
 
     @Get('/:id')

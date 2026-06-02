@@ -19,4 +19,11 @@ export class FindAllTagsQueryDto {
   @IsOptional()
   @IsString()
   q?: string; // recherche par TagTranslation.name
+
+  // Accepted (and ignored here) so admin/editor reads passing ?raw=true aren't
+  // rejected by the global forbidNonWhitelisted ValidationPipe.
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === '1')
+  @IsBoolean()
+  raw?: boolean;
 }

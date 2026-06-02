@@ -3,6 +3,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
   Min,
   MinLength,
@@ -39,4 +40,32 @@ export class AppEnvDto {
   @IsNotEmpty()
   @Type(() => Number)
   APP_PORT: number;
+
+  // Base URL of the Next.js front-end the back-end revalidates against.
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  FRONT_URL: string;
+
+  // Shared secret sent in the x-revalidate-secret header (must match the front).
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  REVALIDATE_SECRET: string;
+
+  // Per-execution sandbox timeout (ms). Optional; defaults to 50 in config.
+  @IsOptional()
+  @IsNumber({ allowInfinity: false, allowNaN: false, maxDecimalPlaces: 0 })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  ALIAS_EVAL_TIMEOUT_MS?: number;
+
+  // Composition / anti-cycle depth guard. Optional; defaults to 20 in config.
+  @IsOptional()
+  @IsNumber({ allowInfinity: false, allowNaN: false, maxDecimalPlaces: 0 })
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  ALIAS_EVAL_MAX_DEPTH?: number;
 }

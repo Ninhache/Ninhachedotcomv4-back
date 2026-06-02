@@ -7,8 +7,11 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     Res,
 } from '@nestjs/common';
+import { AliasService } from 'src/alias/alias.service';
+import { isRaw } from 'src/alias/raw';
 import {
     ApiCreatedResponse,
     ApiNoContentResponse,
@@ -19,15 +22,20 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Public } from 'src/auth/public.decorator';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { ContactService } from './contact.service';
 import { ContactResponseDto } from './dto/contacts-response.dto';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 
 @ApiTags('Contact')
+@RevalidateContent('contacts')
 @Controller('contact')
 export class ContactController {
-    constructor(private readonly contactService: ContactService) {}
+    constructor(
+        private readonly contactService: ContactService,
+        private readonly alias: AliasService
+    ) {}
 
     @Post()
     @ApiOperation({ summary: 'Create a contact' })
@@ -45,8 +53,9 @@ export class ContactController {
     @Get()
     @ApiOperation({ summary: 'List all contacts' })
     @ApiOkResponse({ type: [ContactResponseDto] })
-    findAll() {
-        return this.contactService.findAll();
+    async findAll(@Query('locale') locale = 'fr', @Query('raw') raw?: string) {
+        const contacts = await this.contactService.findAll();
+        return isRaw(raw) ? contacts : this.alias.resolveObject(contacts, locale);
     }
 
     @Get(':id')

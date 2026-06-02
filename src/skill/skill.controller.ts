@@ -6,28 +6,44 @@ import {
     Param,
     Patch,
     Post,
+    Query,
 } from '@nestjs/common';
+import { AliasService } from 'src/alias/alias.service';
+import { isRaw } from 'src/alias/raw';
 import { Public } from 'src/auth/public.decorator';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/create-category.dto';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 import { SkillService } from './skill.service';
 
+@RevalidateContent('skills')
 @Controller('skill')
 export class SkillController {
-    constructor(private readonly skillService: SkillService) {}
+    constructor(
+        private readonly skillService: SkillService,
+        private readonly alias: AliasService
+    ) {}
 
     // ---- Categories (static routes first, before :id param) ----
 
     @Public()
     @Get('categories')
-    findAllCategories() {
-        return this.skillService.findAllCategories();
+    async findAllCategories(
+        @Query('locale') locale = 'fr',
+        @Query('raw') raw?: string
+    ) {
+        const data = await this.skillService.findAllCategories();
+        return isRaw(raw) ? data : this.alias.resolveObject(data, locale);
     }
 
     @Get('categories/admin')
-    findAllCategoriesAdmin() {
-        return this.skillService.findAllCategoriesAdmin();
+    async findAllCategoriesAdmin(
+        @Query('locale') locale = 'fr',
+        @Query('raw') raw?: string
+    ) {
+        const data = await this.skillService.findAllCategoriesAdmin();
+        return isRaw(raw) ? data : this.alias.resolveObject(data, locale);
     }
 
     @Post('categories')
@@ -55,8 +71,12 @@ export class SkillController {
     // Admin-only: the unfiltered list includes hidden skills. The public
     // portfolio reads skills through GET /skill/categories instead.
     @Get()
-    findAll() {
-        return this.skillService.findAll();
+    async findAll(
+        @Query('locale') locale = 'fr',
+        @Query('raw') raw?: string
+    ) {
+        const data = await this.skillService.findAll();
+        return isRaw(raw) ? data : this.alias.resolveObject(data, locale);
     }
 
     @Get(':id')

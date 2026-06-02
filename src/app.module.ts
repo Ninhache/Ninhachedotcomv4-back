@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AdminModule } from './admin/admin.module';
+import { AliasModule } from './alias/alias.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -16,6 +18,8 @@ import { MediaModule } from './media/media.module';
 import { ProfileModule } from './profile/profile.module';
 import { ProjectModule } from './project/project.module';
 import { ResumeModule } from './resume/resume.module';
+import { RevalidationModule } from './revalidation/revalidation.module';
+import { RevalidationInterceptor } from './revalidation/revalidation.interceptor';
 import { SkillModule } from './skill/skill.module';
 import { TagModule } from './tags/tags.module';
 
@@ -28,6 +32,8 @@ import { TagModule } from './tags/tags.module';
             envFilePath: ['.env'],
             expandVariables: false,
         }),
+
+        ScheduleModule.forRoot(),
 
         ServeStaticModule.forRoot({
             rootPath: join(__dirname, '..', 'uploads'),
@@ -57,6 +63,8 @@ import { TagModule } from './tags/tags.module';
         AuthModule,
         AdminModule,
         MediaModule,
+        AliasModule,
+        RevalidationModule,
     ],
     controllers: [AppController],
     providers: [
@@ -64,6 +72,10 @@ import { TagModule } from './tags/tags.module';
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: RevalidationInterceptor,
         },
     ],
 })
