@@ -47,7 +47,8 @@ model User {
 
 model Project {
   id            String               @id @default(cuid())
-  date          DateTime
+  startDate     DateTime
+  endDate       DateTime?
   isVisible     Boolean
   gitUrl        String?
   visitUrl      String?

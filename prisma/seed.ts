@@ -225,7 +225,8 @@ async function main() {
 
         await prisma.project.create({
             data: {
-                date: parseProjectDate(p.date),
+                startDate: parseProjectDate(p.date),
+                endDate: null,
                 isVisible: true,
                 gitUrl: p.links.git !== 'none' ? p.links.git : null,
                 visitUrl: p.links.redirect !== 'none' ? p.links.redirect : null,

@@ -13,7 +13,11 @@ import { CreateProjectTranslationDto } from './create-project.dto';
 export class UpdateProjectDto {
     @IsOptional()
     @IsDateString()
-    date?: string;
+    startDate?: string;
+
+    @IsOptional()
+    @IsDateString()
+    endDate?: string | null;
 
     @IsOptional()
     @IsUrl({ require_tld: false })

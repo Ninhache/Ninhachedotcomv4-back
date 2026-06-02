@@ -18,9 +18,12 @@ export class ProjectService {
     constructor(private prismaService: PrismaService) {}
 
     private toDTO(project: ProjectWithRelations) {
-        const { media, techTags, qualTags, ...rest } = project;
+        const { media, techTags, qualTags, startDate, endDate, ...rest } =
+            project;
         return {
             ...rest,
+            startDate: startDate.toISOString(),
+            endDate: endDate ? endDate.toISOString() : null,
             medias: media,
             techTagIds: techTags.map(t => t.id),
             qualTagIds: qualTags.map(t => t.id),
@@ -31,7 +34,8 @@ export class ProjectService {
 
     async create(createProjectDto: CreateProjectDto) {
         const {
-            date,
+            startDate,
+            endDate,
             qualTagIds,
             techTagIds,
             gitUrl,
@@ -45,7 +49,8 @@ export class ProjectService {
 
         const project = await this.prismaService.project.create({
             data: {
-                date: new Date(date),
+                startDate: new Date(startDate),
+                endDate: endDate ? new Date(endDate) : null,
                 gitUrl: gitUrl ?? null,
                 visitUrl: visitUrl ?? null,
                 playUrl: playUrl ?? null,
@@ -93,7 +98,7 @@ export class ProjectService {
                 techTags: { include: { translations: true } },
                 translations: true,
             },
-            orderBy: { date: 'desc' },
+            orderBy: { startDate: 'desc' },
         });
 
         return projects.map(p => this.toDTO(p));
@@ -121,7 +126,15 @@ export class ProjectService {
         const project = await this.prismaService.project.update({
             where: { id },
             data: {
-                date: dto.date ? new Date(dto.date) : undefined,
+                startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+                // `endDate` absent (undefined) → leave unchanged; explicit null
+                // → clear (mark ongoing); a date string → set it.
+                endDate:
+                    dto.endDate === undefined
+                        ? undefined
+                        : dto.endDate
+                          ? new Date(dto.endDate)
+                          : null,
                 gitUrl: dto.gitUrl,
                 visitUrl: dto.visitUrl,
                 playUrl: dto.playUrl,

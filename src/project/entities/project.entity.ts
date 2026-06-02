@@ -5,7 +5,8 @@ export class Project {
   id: string;
   name: string;
   description: string;
-  date: Date;
+  startDate: Date;
+  endDate: Date | null;
   gitUrl?: string;
   visitUrl?: string;
   techTags: Tag[];

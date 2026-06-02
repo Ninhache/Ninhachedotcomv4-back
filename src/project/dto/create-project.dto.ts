@@ -14,7 +14,11 @@ import {
 
 export class CreateProjectDto {
     @IsDateString()
-    date: string;
+    startDate: string;
+
+    @IsOptional()
+    @IsDateString()
+    endDate?: string | null;
 
     @IsOptional()
     @IsUrl({ require_tld: false })
