@@ -3,12 +3,9 @@ import {
     Body,
     Controller,
     Delete,
-    FileTypeValidator,
     Get,
     HttpCode,
-    MaxFileSizeValidator,
     Param,
-    ParseFilePipe,
     Patch,
     Post,
     Res,
@@ -116,7 +113,8 @@ export class MediaController {
 
     @Delete(':id')
     @HttpCode(204)
-    async remove(@Param('id') id: string) {
-        return await this.mediaService.remove(id);
+    async remove(@Param('id') id: string): Promise<void> {
+        // 204 No Content — must not return a body.
+        await this.mediaService.remove(id);
     }
 }

@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { MediaType, Prisma } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { join } from 'path';
@@ -19,10 +18,7 @@ const VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime'];
 
 @Injectable()
 export class MediaService {
-    constructor(
-        private readonly prisma: PrismaService,
-        private readonly configService: ConfigService
-    ) {}
+    constructor(private readonly prisma: PrismaService) {}
 
     private detectMediaType(mimeType: string): MediaType {
         if (IMAGE_MIMES.includes(mimeType)) return MediaType.IMAGE;
