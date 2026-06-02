@@ -17,4 +17,11 @@ export class CreateMediaDto {
     @IsOptional()
     @IsString()
     projectId?: string;
+
+    @ApiPropertyOptional({
+        description: 'Alt text for the media',
+    })
+    @IsOptional()
+    @IsString()
+    alt?: string;
 }

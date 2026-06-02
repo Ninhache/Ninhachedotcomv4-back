@@ -39,6 +39,7 @@ export class MediaService {
             type,
             originalName: file.originalname,
             mimeType: file.mimetype,
+            alt: createMediaDto.alt ?? null,
             ...(createMediaDto.projectId
                 ? { project: { connect: { id: createMediaDto.projectId } } }
                 : {}),
@@ -80,6 +81,10 @@ export class MediaService {
         const data: Prisma.MediaUpdateInput = {
             ...(updateMediaDto.type !== undefined
                 ? { type: updateMediaDto.type }
+                : {}),
+            // alt absent → leave unchanged; "" → clear; a string → set it.
+            ...(updateMediaDto.alt !== undefined
+                ? { alt: updateMediaDto.alt }
                 : {}),
             ...(updateMediaDto.projectId !== undefined
                 ? updateMediaDto.projectId

@@ -6,5 +6,6 @@ export class Media {
     type: MediaType;
     originalName: string | null;
     mimeType: string | null;
+    alt: string | null;
     projectId: string | null;
 }

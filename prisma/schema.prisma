@@ -80,6 +80,7 @@ model Media {
   type         MediaType
   originalName String?
   mimeType     String?
+  alt          String?
   project      Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId    String?
 }

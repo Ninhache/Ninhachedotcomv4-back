@@ -9,4 +9,9 @@ export class UpdateMediaDto {
     @IsOptional()
     @IsString()
     projectId?: string;
+
+    // Alt text for the media. An empty string clears it.
+    @IsOptional()
+    @IsString()
+    alt?: string;
 }
