@@ -315,10 +315,10 @@ async function main() {
             names: { fr: 'Ninhache', en: 'Ninhache' },
         },
         {
-            contactUrl: 'mailto:neo.almeida2706@gmail.com',
+            contactUrl: 'mailto:moi@exemple.fr',
             imageUrl: 'svg/contact/Mail.svg',
             cssSize: '268px',
-            names: { fr: 'neo.almeida2706@gmail.com', en: 'neo.almeida2706@gmail.com' },
+            names: { fr: 'moi@exemple.fr', en: 'moi@exemple.fr' },
         },
     ];
 
