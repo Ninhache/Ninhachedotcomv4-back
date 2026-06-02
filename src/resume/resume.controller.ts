@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOkResponse } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { ResumeDto } from './dto/resume.dto';
 import { ResumeService } from './resume.service';
@@ -20,7 +20,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const uploadStorage = diskStorage({
     destination: join(__dirname, '..', '..', 'uploads'),
     filename: (_req, file, cb) => {
-        const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+        const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
         cb(null, uniqueName);
     },
 });

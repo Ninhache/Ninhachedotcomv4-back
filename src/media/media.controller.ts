@@ -14,10 +14,10 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import type { Response } from 'express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
 import { MediaService } from './media.service';
@@ -38,7 +38,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const uploadStorage = diskStorage({
     destination: join(__dirname, '..', '..', 'uploads'),
     filename: (_req, file, cb) => {
-        const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+        const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
         cb(null, uniqueName);
     },
 });
