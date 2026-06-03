@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MediaType, Prisma } from '@prisma/client';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { spawn } from 'child_process';
+import { rename, unlink } from 'fs/promises';
+import { extname, join } from 'path';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateMediaDto } from './dto/create-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
@@ -16,8 +17,15 @@ const IMAGE_MIMES = [
 
 const VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime'];
 
+// MP4/MOV containers whose `moov` atom must sit at the front for HTTP streaming.
+// Screen recorders write it at the end, which plays from disk but breaks
+// streaming/embedding ("could not decode h264"). We remux these with faststart.
+const FASTSTART_MIMES = ['video/mp4', 'video/quicktime'];
+
 @Injectable()
 export class MediaService {
+    private readonly logger = new Logger(MediaService.name);
+
     constructor(private readonly prisma: PrismaService) {}
 
     private detectMediaType(mimeType: string): MediaType {
@@ -30,7 +38,56 @@ export class MediaService {
         return `/uploads/${filename}`;
     }
 
+    /**
+     * Lossless remux of an uploaded MP4/MOV so its `moov` atom sits at the front
+     * (`-movflags +faststart`), making it streamable/embeddable over HTTP.
+     * No re-encode (`-c copy`). Best-effort: if ffmpeg is missing or fails, the
+     * original upload is kept and the upload still succeeds.
+     */
+    private async faststartRemux(file: Express.Multer.File): Promise<void> {
+        if (!FASTSTART_MIMES.includes(file.mimetype)) return;
+
+        const src = file.path;
+        const tmp = `${src}.faststart${extname(file.filename) || '.mp4'}`;
+
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const ff = spawn('ffmpeg', [
+                    '-y',
+                    '-loglevel',
+                    'error',
+                    '-i',
+                    src,
+                    '-c',
+                    'copy',
+                    '-movflags',
+                    '+faststart',
+                    tmp,
+                ]);
+                let stderr = '';
+                ff.stderr.on('data', d => (stderr += d.toString()));
+                ff.on('error', reject); // e.g. ffmpeg not installed
+                ff.on('close', code =>
+                    code === 0
+                        ? resolve()
+                        : reject(new Error(stderr || `ffmpeg exited ${code}`))
+                );
+            });
+            await rename(tmp, src); // atomically swap in the faststart version
+            this.logger.log(`faststart remux applied to ${file.filename}`);
+        } catch (err) {
+            await unlink(tmp).catch(() => {});
+            this.logger.warn(
+                `faststart remux skipped for ${file.filename}: ${
+                    err instanceof Error ? err.message : err
+                }`
+            );
+        }
+    }
+
     async create(file: Express.Multer.File, createMediaDto: CreateMediaDto) {
+        await this.faststartRemux(file);
+
         const mediaUrl = this.buildMediaUrl(file.filename);
         const type = createMediaDto.type ?? this.detectMediaType(file.mimetype);
 
