@@ -6,6 +6,7 @@ import {
     IsOptional,
     IsString,
     IsUrl,
+    Matches,
     ValidateNested,
 } from 'class-validator';
 import { CreateProjectTranslationDto } from './create-project.dto';
@@ -32,7 +33,9 @@ export class UpdateProjectDto {
     playUrl?: string;
 
     @IsOptional()
-    @IsString()
+    @Matches(/^(https?:\/\/.+|\/.+)$/i, {
+        message: 'logoUrl must be an absolute URL or a root-relative path',
+    })
     logoUrl?: string;
 
     @IsOptional()
