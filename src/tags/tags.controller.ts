@@ -9,12 +9,16 @@ import {
     Query,
 } from '@nestjs/common';
 import { Public } from 'src/auth/public.decorator';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { FindAllTagsQueryDto } from './dto/find-all.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { UpdateVisibilityDto } from './dto/update-visibility.dto';
 import { TagsService } from './tags.service';
 
+// Tags are rendered inside projects, skills and experiences, so a tag mutation
+// must invalidate all three cached surfaces on the front.
+@RevalidateContent(['projects', 'skills', 'experiences'])
 @Controller('tags')
 export class TagsController {
     constructor(private readonly tagService: TagsService) {}

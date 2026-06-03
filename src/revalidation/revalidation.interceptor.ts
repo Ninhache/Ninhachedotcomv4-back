@@ -38,10 +38,13 @@ export class RevalidationInterceptor implements NestInterceptor {
         );
         if (!meta) return next.handle();
 
-        const tags = [
-            meta.entity,
-            ...Object.values(Locale).map(loc => `${meta.entity}:${loc}`),
-        ];
+        const entities = Array.isArray(meta.entity)
+            ? meta.entity
+            : [meta.entity];
+        const tags = entities.flatMap(entity => [
+            entity,
+            ...Object.values(Locale).map(loc => `${entity}:${loc}`),
+        ]);
         if (meta.greeting) tags.push('greeting');
 
         return next
