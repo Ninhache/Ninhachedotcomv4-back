@@ -27,6 +27,9 @@ export class ProfileResponseDto {
     @ApiProperty()
     name: string;
 
+    @ApiProperty({ nullable: true })
+    imageUrl: string | null;
+
     @ApiProperty()
     updatedAt: string;
 

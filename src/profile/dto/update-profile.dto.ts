@@ -42,6 +42,12 @@ export class UpdateProfileDto {
     @IsString()
     name?: string;
 
+    // Portrait URL (locale-independent), typically a /uploads/... path returned
+    // by POST /media.
+    @IsOptional()
+    @IsString()
+    imageUrl?: string;
+
     @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })

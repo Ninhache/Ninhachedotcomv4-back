@@ -204,6 +204,7 @@ model ContactTranslation {
 model Profile {
   id           String               @id @default(cuid())
   name         String               @default("")
+  imageUrl     String?
   updatedAt    DateTime             @updatedAt
   translations ProfileTranslation[]
 }

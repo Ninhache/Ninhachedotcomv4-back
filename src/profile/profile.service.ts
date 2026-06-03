@@ -38,6 +38,7 @@ export class ProfileService {
         return {
             id: profile.id,
             name: profile.name,
+            imageUrl: profile.imageUrl ?? null,
             updatedAt: profile.updatedAt.toISOString(),
             translations: profile.translations.map((t: any) => ({
                 locale: t.locale,
@@ -80,6 +81,7 @@ export class ProfileService {
             where: { id: profile!.id },
             data: {
                 name: dto.name,
+                imageUrl: dto.imageUrl,
                 translations: dto.translations
                     ? {
                           deleteMany: {},
