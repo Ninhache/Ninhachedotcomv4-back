@@ -40,14 +40,18 @@ import { TagModule } from './tags/tags.module';
             serveRoot: '/uploads',
             serveStaticOptions: {
                 index: false,
-                // Uploads are user-supplied. `nosniff` stops browsers from
-                // MIME-sniffing a file into something executable; the CSP
-                // `sandbox` neuters scripts in a malicious SVG even if it's
-                // opened directly (stored-XSS defence). We still allow SVG
-                // because skill/project logos use it.
-                setHeaders: res => {
+                // Uploads are user-supplied. `nosniff` (on everything) stops
+                // browsers MIME-sniffing a file into something executable.
+                // The CSP `sandbox` is only needed for types that can carry
+                // active content (SVG/HTML) — applying it to video/images is
+                // overly broad and breaks direct <video> playback (a raw
+                // <video> fetches this response directly, unlike <img> which
+                // the front launders through next/image). So scope it.
+                setHeaders: (res, filePath) => {
                     res.setHeader('X-Content-Type-Options', 'nosniff');
-                    res.setHeader('Content-Security-Policy', 'sandbox');
+                    if (/\.(svgz?|x?html?)$/i.test(filePath)) {
+                        res.setHeader('Content-Security-Policy', 'sandbox');
+                    }
                 },
             },
         }),
