@@ -15,6 +15,9 @@ export class ProfileTranslationResponseDto {
 
     @ApiProperty()
     skillsTitle: string;
+
+    @ApiProperty()
+    introduction: string;
 }
 
 export class ProfileResponseDto {

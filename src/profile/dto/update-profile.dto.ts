@@ -29,6 +29,12 @@ export class UpdateProfileTranslationDto {
     @IsOptional()
     @IsString()
     skillsTitle?: string;
+
+    // The public "Who am I?" paragraph. May contain a literal <projects>…</projects>
+    // marker and @@ alias tokens — stored verbatim, resolved/escaped by the reader.
+    @IsOptional()
+    @IsString()
+    introduction?: string;
 }
 
 export class UpdateProfileDto {

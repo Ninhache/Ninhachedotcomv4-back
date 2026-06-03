@@ -211,10 +211,11 @@ model Profile {
 model ProfileTranslation {
   id          String  @id @default(cuid())
   locale      Locale
-  greeting    String  @default("")
-  profession  String  @default("")
-  description String  @default("")
-  skillsTitle String  @default("")
+  greeting     String  @default("")
+  profession   String  @default("")
+  description  String  @default("")
+  skillsTitle  String  @default("")
+  introduction String  @default("")
   profile     Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId   String
 

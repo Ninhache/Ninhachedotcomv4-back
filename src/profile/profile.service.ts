@@ -17,6 +17,7 @@ const EMPTY_PROFILE = {
             profession: '',
             description: '',
             skillsTitle: '',
+            introduction: '',
         },
         {
             locale: Locale.en,
@@ -24,6 +25,7 @@ const EMPTY_PROFILE = {
             profession: '',
             description: '',
             skillsTitle: '',
+            introduction: '',
         },
     ],
 };
@@ -43,6 +45,7 @@ export class ProfileService {
                 profession: t.profession,
                 description: t.description,
                 skillsTitle: t.skillsTitle,
+                introduction: t.introduction,
             })),
         };
     }
@@ -86,6 +89,7 @@ export class ProfileService {
                               profession: t.profession ?? '',
                               description: t.description ?? '',
                               skillsTitle: t.skillsTitle ?? '',
+                              introduction: t.introduction ?? '',
                           })),
                       }
                     : undefined,
