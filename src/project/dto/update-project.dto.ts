@@ -1,4 +1,65 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateProjectDto } from './create-project.dto';
+import { Type } from 'class-transformer';
+import {
+    IsArray,
+    IsBoolean,
+    IsDateString,
+    IsOptional,
+    IsString,
+    IsUrl,
+    Matches,
+    ValidateNested,
+} from 'class-validator';
+import { CreateProjectTranslationDto } from './create-project.dto';
 
-export class UpdateProjectDto extends PartialType(CreateProjectDto) {}
+export class UpdateProjectDto {
+    @IsOptional()
+    @IsDateString()
+    startDate?: string;
+
+    @IsOptional()
+    @IsDateString()
+    endDate?: string | null;
+
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    gitUrl?: string;
+
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    visitUrl?: string;
+
+    @IsOptional()
+    @IsUrl({ require_tld: false })
+    playUrl?: string;
+
+    @IsOptional()
+    @Matches(/^(https?:\/\/.+|\/.+)$/i, {
+        message: 'logoUrl must be an absolute URL or a root-relative path',
+    })
+    logoUrl?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    isVisible?: boolean;
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    mediaIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => CreateProjectTranslationDto)
+    translations?: CreateProjectTranslationDto[];
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    techTagIds?: string[];
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    qualTagIds?: string[];
+}

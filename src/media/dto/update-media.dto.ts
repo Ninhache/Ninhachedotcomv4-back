@@ -1,4 +1,17 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateMediaDto } from './create-media.dto';
+import { MediaType } from '@prisma/client';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
-export class UpdateMediaDto extends PartialType(CreateMediaDto) {}
+export class UpdateMediaDto {
+    @IsOptional()
+    @IsEnum(MediaType)
+    type?: MediaType;
+
+    @IsOptional()
+    @IsString()
+    projectId?: string;
+
+    // Alt text for the media. An empty string clears it.
+    @IsOptional()
+    @IsString()
+    alt?: string;
+}

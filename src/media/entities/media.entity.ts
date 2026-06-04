@@ -1,10 +1,11 @@
-export class Media {
-  id: string;
-  url: string;
-  type: MediaType;
-}
+import { MediaType } from '@prisma/client';
 
-export enum MediaType {
-  IMAGE = 'IMAGE',
-  VIDEO = 'VIDEO',
+export class Media {
+    id: string;
+    mediaUrl: string;
+    type: MediaType;
+    originalName: string | null;
+    mimeType: string | null;
+    alt: string | null;
+    projectId: string | null;
 }
