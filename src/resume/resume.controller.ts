@@ -1,34 +1,106 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+    BadRequestException,
+    Controller,
+    Get,
+    Post,
+    UploadedFiles,
+    UseInterceptors,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiOkResponse } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
+import { ResumeDto } from './dto/resume.dto';
 import { ResumeService } from './resume.service';
-import { CreateResumeDto } from './dto/create-resume.dto';
-import { UpdateResumeDto } from './dto/update-resume.dto';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const uploadStorage = diskStorage({
+    destination: join(__dirname, '..', '..', 'uploads'),
+    filename: (_req, file, cb) => {
+        const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
+        cb(null, uniqueName);
+    },
+});
+
+@RevalidateContent('resume')
 @Controller('resume')
 export class ResumeController {
-  constructor(private readonly resumeService: ResumeService) {}
+    constructor(private readonly resumeService: ResumeService) {}
 
-  @Post()
-  create(@Body() createResumeDto: CreateResumeDto) {
-    return this.resumeService.create(createResumeDto);
-  }
+    @Post()
+    @UseInterceptors(
+        FileFieldsInterceptor(
+            [
+                { name: 'fr', maxCount: 1 },
+                { name: 'en', maxCount: 1 },
+            ],
+            {
+                storage: uploadStorage,
+                limits: { fileSize: MAX_FILE_SIZE },
+                fileFilter: (_req, file, cb) => {
+                    if (file.mimetype === 'application/pdf') {
+                        cb(null, true);
+                    } else {
+                        cb(
+                            new BadRequestException(
+                                `Invalid file type: ${file.mimetype}. Only application/pdf is allowed.`
+                            ),
+                            false
+                        );
+                    }
+                },
+            }
+        )
+    )
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                fr: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'French resume PDF',
+                },
+                en: {
+                    type: 'string',
+                    format: 'binary',
+                    description: 'English resume PDF',
+                },
+            },
+        },
+    })
+    create(
+        @UploadedFiles()
+        files: { fr?: Express.Multer.File[]; en?: Express.Multer.File[] }
+    ) {
+        if (!files?.fr?.length && !files?.en?.length) {
+            throw new BadRequestException(
+                'At least one PDF file is required (field name: "fr" or "en")'
+            );
+        }
 
-  @Get()
-  findAll() {
-    return this.resumeService.findAll();
-  }
+        const localeFiles: {
+            locale: 'fr' | 'en';
+            file: Express.Multer.File;
+        }[] = [];
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.resumeService.findOne(+id);
-  }
+        if (files.fr?.length) {
+            localeFiles.push({ locale: 'fr', file: files.fr[0] });
+        }
+        if (files.en?.length) {
+            localeFiles.push({ locale: 'en', file: files.en[0] });
+        }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateResumeDto: UpdateResumeDto) {
-    return this.resumeService.update(+id, updateResumeDto);
-  }
+        return this.resumeService.create(localeFiles);
+    }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.resumeService.remove(+id);
-  }
+    @Get()
+    @ApiOkResponse({ type: ResumeDto })
+    findCurrentResume() {
+        return this.resumeService.findCurrentResume();
+    }
 }

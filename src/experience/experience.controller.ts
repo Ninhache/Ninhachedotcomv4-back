@@ -1,34 +1,79 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ExperienceService } from './experience.service';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Res,
+} from '@nestjs/common';
+import { AliasService } from 'src/alias/alias.service';
+import { isRaw } from 'src/alias/raw';
+import { Public } from 'src/auth/public.decorator';
+import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { CreateExperienceDto } from './dto/create-experience.dto';
 import { UpdateExperienceDto } from './dto/update-experience.dto';
+import { UpdateVisibilityDto } from './dto/update-visibility.dto';
+import { ExperienceService } from './experience.service';
+import type { Response } from 'express';
 
-@Controller('experience')
+@RevalidateContent('experiences')
+@Controller('experiences')
 export class ExperienceController {
-  constructor(private readonly experienceService: ExperienceService) {}
+    constructor(
+        private readonly experienceService: ExperienceService,
+        private readonly alias: AliasService
+    ) {}
 
-  @Post()
-  create(@Body() createExperienceDto: CreateExperienceDto) {
-    return this.experienceService.create(createExperienceDto);
-  }
+    @Post()
+    async create(
+        @Body() createExperienceDto: CreateExperienceDto,
+        @Res({ passthrough: true }) res: Response
+    ) {
+        const created =
+            await this.experienceService.create(createExperienceDto);
+        res.setHeader('Location', `/experiences/${created.id}`);
 
-  @Get()
-  findAll() {
-    return this.experienceService.findAll();
-  }
+        return created;
+    }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.experienceService.findOne(+id);
-  }
+    @Public()
+    @Get()
+    async findAll(@Query('locale') locale = 'fr', @Query('raw') raw?: string) {
+        const experiences = await this.experienceService.findAll();
+        return isRaw(raw)
+            ? experiences
+            : this.alias.resolveObject(experiences, locale);
+    }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateExperienceDto: UpdateExperienceDto) {
-    return this.experienceService.update(+id, updateExperienceDto);
-  }
+    @Get('/:id')
+    async findOne(@Param('id') id: string) {
+        return await this.experienceService.findOne(id);
+    }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.experienceService.remove(+id);
-  }
+    @Patch(':id')
+    async update(
+        @Param('id') id: string,
+        @Body() updateExperienceDto: UpdateExperienceDto
+    ) {
+        return await this.experienceService.update(id, updateExperienceDto);
+    }
+
+    @Patch(':id/visibility')
+    async updateVisibility(
+        @Param('id') id: string,
+        @Body() dto: UpdateVisibilityDto
+    ) {
+        return await this.experienceService.updateVisibility(id, dto.isVisible);
+    }
+
+    @Delete(':id')
+    @HttpCode(204)
+    async remove(@Param('id') id: string): Promise<void> {
+        // 204 No Content — must not return a body.
+        await this.experienceService.remove(id);
+    }
 }
