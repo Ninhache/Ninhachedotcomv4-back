@@ -62,10 +62,12 @@ async function main() {
             create: {
                 id: c.id,
                 isVisible: c.isVisible,
+                order: c.order ?? 0,
                 translations: { create: translations },
             },
             update: {
                 isVisible: c.isVisible,
+                order: c.order ?? 0,
                 translations: { deleteMany: {}, create: translations },
             },
         });
@@ -78,6 +80,13 @@ async function main() {
             locale: tr.locale,
             name: tr.name,
         }));
+        // explicit join rows carrying the per-category order
+        const categoryLinks = (s.categoryLinks ?? []).map(
+            (l: { categoryId: string; order: number }) => ({
+                order: l.order,
+                category: { connect: { id: l.categoryId } },
+            })
+        );
         await prisma.skill.upsert({
             where: { id: s.id },
             create: {
@@ -86,7 +95,7 @@ async function main() {
                 wikiUrl: s.wikiUrl,
                 isVisible: s.isVisible,
                 tags: { connect: ids(s.tagIds) },
-                categories: { connect: ids(s.categoryIds) },
+                categoryLinks: { create: categoryLinks },
                 translations: { create: translations },
             },
             update: {
@@ -94,7 +103,7 @@ async function main() {
                 wikiUrl: s.wikiUrl,
                 isVisible: s.isVisible,
                 tags: { set: ids(s.tagIds) },
-                categories: { set: ids(s.categoryIds) },
+                categoryLinks: { deleteMany: {}, create: categoryLinks },
                 translations: { deleteMany: {}, create: translations },
             },
         });

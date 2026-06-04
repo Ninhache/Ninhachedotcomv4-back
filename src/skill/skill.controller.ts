@@ -14,6 +14,7 @@ import { Public } from 'src/auth/public.decorator';
 import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/create-category.dto';
 import { CreateSkillDto } from './dto/create-skill.dto';
+import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 import { SkillService } from './skill.service';
 
@@ -49,6 +50,13 @@ export class SkillController {
     @Post('categories')
     createCategory(@Body() dto: CreateCategoryDto) {
         return this.skillService.createCategory(dto);
+    }
+
+    // Static route — declared before 'categories/:id' so 'reorder' isn't matched
+    // as an :id. Admin-only (guarded by the global JwtAuthGuard, not @Public).
+    @Patch('categories/reorder')
+    reorderCategories(@Body() dto: ReorderCategoriesDto) {
+        return this.skillService.reorderCategories(dto.items);
     }
 
     @Patch('categories/:id')
