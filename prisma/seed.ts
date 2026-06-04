@@ -186,13 +186,17 @@ async function main() {
             },
         });
 
-        for (const skill of cat.skills) {
+        for (const [order, skill] of cat.skills.entries()) {
             await prisma.skill.create({
                 data: {
                     image: skill.logo,
                     wikiUrl: skill.link,
                     isVisible: true,
-                    categories: { connect: [{ id: category.id }] },
+                    categoryLinks: {
+                        create: [
+                            { category: { connect: { id: category.id } }, order },
+                        ],
+                    },
                     translations: {
                         create: [
                             { locale: Locale.fr, name: skill.name },

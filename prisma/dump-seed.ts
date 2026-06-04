@@ -32,7 +32,7 @@ async function main() {
         include: {
             translations: true,
             tags: { select: { id: true } },
-            categories: { select: { id: true } },
+            categoryLinks: { select: { categoryId: true, order: true } },
         },
         orderBy: { id: 'asc' },
     });
@@ -85,6 +85,7 @@ async function main() {
         skillCategories: skillCategories.map(c => ({
             id: c.id,
             isVisible: c.isVisible,
+            order: c.order,
             translations: c.translations.map(tr => ({
                 id: tr.id,
                 locale: tr.locale,
@@ -97,7 +98,10 @@ async function main() {
             wikiUrl: s.wikiUrl,
             isVisible: s.isVisible,
             tagIds: s.tags.map(x => x.id),
-            categoryIds: s.categories.map(x => x.id),
+            categoryLinks: s.categoryLinks.map(l => ({
+                categoryId: l.categoryId,
+                order: l.order,
+            })),
             translations: s.translations.map(tr => ({
                 id: tr.id,
                 locale: tr.locale,

@@ -112,13 +112,13 @@ model TagTranslation {
 /* ---------------- SKILLS ---------------- */
 
 model Skill {
-  id           String            @id @default(cuid())
-  image        String
-  wikiUrl      String?
-  isVisible    Boolean
-  tags         Tag[]             @relation("SkillTags")
-  categories   SkillCategory[]   @relation("SkillToCategory")
-  translations SkillTranslation[]
+  id            String             @id @default(cuid())
+  image         String
+  wikiUrl       String?
+  isVisible     Boolean
+  tags          Tag[]              @relation("SkillTags")
+  categoryLinks SkillOnCategory[]
+  translations  SkillTranslation[]
 }
 
 model SkillTranslation {
@@ -136,8 +136,23 @@ model SkillTranslation {
 model SkillCategory {
   id           String                     @id @default(cuid())
   isVisible    Boolean
-  skills       Skill[]                    @relation("SkillToCategory")
+  order        Int                        @default(0)
+  skillLinks   SkillOnCategory[]
   translations SkillCategoryTranslation[]
+}
+
+// Explicit join between Skill and SkillCategory carrying the per-category
+// display order of a skill (same skill can sit at a different position in each
+// category). Replaces the previous implicit m2m relation "SkillToCategory".
+model SkillOnCategory {
+  skill      Skill         @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skillId    String
+  category   SkillCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  order      Int           @default(0)
+
+  @@id([skillId, categoryId])
+  @@index([categoryId])
 }
 
 model SkillCategoryTranslation {
