@@ -8,6 +8,8 @@ import { AdminModule } from './admin/admin.module';
 import { AliasModule } from './alias/alias.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ArticleModule } from './article/article.module';
+import { ArticleCategoryModule } from './article-category/article-category.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { CompanyModule } from './company/company.module';
@@ -63,6 +65,8 @@ import { TimelineModule } from './timeline/timeline.module';
         LocalesModule,
         ProjectModule,
         SkillModule,
+        ArticleCategoryModule,
+        ArticleModule,
         CompanyModule,
         MissionModule,
         PositionModule,

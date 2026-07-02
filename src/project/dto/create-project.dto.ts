@@ -52,6 +52,16 @@ export class CreateProjectDto {
     @IsEnum(ProjectNature, { each: true })
     natures: ProjectNature[];
 
+    // Optional cross-links to the blog (« voir les articles » / « lire
+    // l'article »). Independent of each other; both nullable in the schema.
+    @IsOptional()
+    @IsString()
+    blogCategoryId?: string;
+
+    @IsOptional()
+    @IsString()
+    blogArticleId?: string;
+
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateProjectTranslationDto)
