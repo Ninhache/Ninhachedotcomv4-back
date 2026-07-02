@@ -10,18 +10,22 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { CompanyModule } from './company/company.module';
 import configs from './config';
 import { ContactModule } from './contact/contact.module';
-import { ExperienceModule } from './experience/experience.module';
+import { CvModule } from './cv/cv.module';
+import { EducationModule } from './education/education.module';
 import { LocalesModule } from './locales/locales.module';
 import { MediaModule } from './media/media.module';
+import { MissionModule } from './mission/mission.module';
+import { PositionModule } from './position/position.module';
 import { ProfileModule } from './profile/profile.module';
 import { ProjectModule } from './project/project.module';
 import { ResumeModule } from './resume/resume.module';
 import { RevalidationModule } from './revalidation/revalidation.module';
 import { RevalidationInterceptor } from './revalidation/revalidation.interceptor';
 import { SkillModule } from './skill/skill.module';
-import { TagModule } from './tags/tags.module';
+import { TimelineModule } from './timeline/timeline.module';
 
 @Module({
     imports: [
@@ -59,11 +63,15 @@ import { TagModule } from './tags/tags.module';
         LocalesModule,
         ProjectModule,
         SkillModule,
-        TagModule,
-        ExperienceModule,
+        CompanyModule,
+        MissionModule,
+        PositionModule,
+        EducationModule,
+        TimelineModule,
         ContactModule,
         ProfileModule,
         ResumeModule,
+        CvModule,
         AuthModule,
         AdminModule,
         MediaModule,

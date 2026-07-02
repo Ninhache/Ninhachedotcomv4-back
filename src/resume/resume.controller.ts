@@ -11,6 +11,7 @@ import { ApiBody, ApiConsumes, ApiOkResponse } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
+import { Public } from 'src/auth/public.decorator';
 import { RevalidateContent } from 'src/revalidation/revalidate.decorator';
 import { ResumeDto } from './dto/resume.dto';
 import { ResumeService } from './resume.service';
@@ -98,6 +99,7 @@ export class ResumeController {
         return this.resumeService.create(localeFiles);
     }
 
+    @Public()
     @Get()
     @ApiOkResponse({ type: ResumeDto })
     findCurrentResume() {

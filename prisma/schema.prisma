@@ -14,11 +14,22 @@ enum MediaType {
   VIDEO
 }
 
-enum TagType {
-  TECH
-  QUAL
-  SKILL_CATEGORY
-  EXPERIENCE_TECH
+// Project nature categories (formerly QUAL tags). The value set mirrors the
+// front's SORT_TYPE keys; a project's natures drive its sort buckets and its
+// "type" label (Personnel/Scolaire/Web/Simulation). DATE/RANDOM are legacy sort
+// directives kept so no historical assignment is lost.
+enum ProjectNature {
+  SCHOOL
+  PERSONAL
+  WEB
+  SIMULATIONS
+  DATE
+  RANDOM
+}
+
+enum CompanyKind {
+  EMPLOYER
+  CLIENT
 }
 
 enum ContractType {
@@ -55,8 +66,10 @@ model Project {
   playUrl       String?
   logoUrl       String?
   media         Media[]
-  techTags      Tag[]                @relation("ProjectTechTags")
-  qualTags      Tag[]                @relation("ProjectQualTags")
+  // Tech stack = skills (the unified technology entity; formerly TECH tags).
+  skills        Skill[]              @relation("ProjectSkills")
+  // Project nature(s) — formerly QUAL tags, now a scalar enum array.
+  natures       ProjectNature[]
   translations  ProjectTranslation[]
 }
 
@@ -74,6 +87,12 @@ model ProjectTranslation {
 
 /* ---------------- MEDIA ---------------- */
 
+// A Media row is an uploaded file record (mediaUrl = /uploads/<uuid>.ext),
+// produced by POST /media. It is the shared upload mechanism: every owner that
+// carries an image (Company.logoUrl, Skill.image, Mission.imageUrl, …) uploads
+// through here and stores the returned path string directly on its own field —
+// see docs/specs/unified-assets.md. Media rows optionally belong to a Project
+// (the one owner that keeps a relation, for its N-image galleries).
 model Media {
   id           String    @id @default(cuid())
   mediaUrl     String
@@ -81,44 +100,29 @@ model Media {
   originalName String?
   mimeType     String?
   alt          String?
+  order        Int       @default(0)
   project      Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId    String?
 }
 
-/* ---------------- TAGS ---------------- */
+/* ---------------- SKILLS (the unified technology entity) ---------------- */
 
-model Tag {
-  id             String            @id @default(cuid())
-  type           TagType
-  isVisible      Boolean
-  hexColor       String
-  projectsAsTech Project[]         @relation("ProjectTechTags")
-  projectsAsQual Project[]         @relation("ProjectQualTags")
-  skills         Skill[]           @relation("SkillTags")
-  experiences    Experience[]      @relation("ExperienceTags")
-  translations   TagTranslation[]
-}
-
-model TagTranslation {
-  id      String @id @default(cuid())
-  locale  Locale
-  name    String
-  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  tagId   String
-
-  @@unique([tagId, locale])
-}
-
-/* ---------------- SKILLS ---------------- */
-
+// A Skill is the single representation of a technology/tool. It is shown in the
+// public skills grid (with an icon + wiki link) AND used as the tech-stack tag
+// on projects, missions, and employer cards. It absorbed the former TECH `Tag`
+// pool — projects/missions/companies link here, and the chips can render as
+// links via `wikiUrl`.
 model Skill {
   id            String             @id @default(cuid())
-  image         String
+  image         String?            // SVG/logo — nullable: skills migrated from tags have none yet
   wikiUrl       String?
   isVisible     Boolean
-  tags          Tag[]              @relation("SkillTags")
   categoryLinks SkillOnCategory[]
   translations  SkillTranslation[]
+  // Tech-stack usages (formerly Tag relations).
+  projects      Project[]          @relation("ProjectSkills")
+  missions      Mission[]          @relation("MissionSkills")
+  companies     Company[]          @relation("CompanySkills")
 }
 
 model SkillTranslation {
@@ -165,32 +169,133 @@ model SkillCategoryTranslation {
   @@unique([skillCategoryId, locale])
 }
 
-/* ---------------- EXPERIENCES ---------------- */
+/* ---------------- TIMELINE: COMPANIES / MISSIONS / EDUCATION ---------------- */
 
-model Experience {
-  id           String       @id @default(cuid())
-  startDate    DateTime
-  endDate      DateTime
-  contractType ContractType
-  localisation String
-  isVisible    Boolean
-  siteUrl      String?
-  imageUrl     String?
-  order        Int          @default(0)
-  tags         Tag[]        @relation("ExperienceTags")
-  translations ExperienceTranslation[]
-  companyName  String
+// A company is either the user's EMPLOYER (an ESN/consultancy carrying the
+// long-term contract: contractType + employmentStart/End) or a CLIENT a mission
+// was delivered for. Name/localisation are locale-independent proper nouns, but
+// the editorial blurb (description) is translatable, so it lives in the sibling
+// CompanyTranslation table.
+model Company {
+  id              String        @id @default(cuid())
+  kind            CompanyKind
+  name            String
+  localisation    String?
+  siteUrl         String?
+  // Large illustration image (« fond ») shown on the public experience card.
+  backgroundUrl   String?
+  // The company's actual logo — used by the standalone timeline app, not the public site.
+  logoUrl         String?
+  isVisible       Boolean       @default(true)
+  order           Int           @default(0)
+  // Employer-only — NULL when kind = CLIENT. employmentEnd NULL = current employer.
+  contractType    ContractType?
+  employmentStart DateTime?
+  employmentEnd   DateTime?
+  // CLIENT-only: the employer this client was engaged through. NULL for EMPLOYER rows.
+  parentEmployerId String?
+  parentEmployer   Company?     @relation("CompanyClients", fields: [parentEmployerId], references: [id], onDelete: Cascade)
+  clients          Company[]    @relation("CompanyClients")
+  employerMissions Mission[]    @relation("MissionEmployer")
+  clientMissions   Mission[]    @relation("MissionClient")
+  // EMPLOYER-only: the job-title progression held at this employer over time.
+  positions        Position[]
+  // EMPLOYER-level curated skills shown on the public experience card. Separate
+  // axis from per-mission skills so a company with many missions doesn't
+  // surface an unbounded list on its card.
+  skills           Skill[]      @relation("CompanySkills")
+  // Per-locale editorial blurb shown on the public card (employer) or in the
+  // mission modal (client). Optional: a company may have none.
+  translations     CompanyTranslation[]
 }
 
-model ExperienceTranslation {
-  id           String     @id @default(cuid())
-  locale       Locale
-  jobTitle     String
-  description  String
-  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
-  experienceId String
+// Translatable editorial blurb for a Company, one row per supported locale.
+model CompanyTranslation {
+  id          String  @id @default(cuid())
+  locale      Locale
+  description String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
 
-  @@unique([experienceId, locale])
+  @@unique([companyId, locale])
+}
+
+// One engagement under an employer, optionally delivered for a client company.
+model Mission {
+  id                String               @id @default(cuid())
+  employerCompany   Company              @relation("MissionEmployer", fields: [employerCompanyId], references: [id], onDelete: Cascade)
+  employerCompanyId String
+  clientCompany     Company?             @relation("MissionClient", fields: [clientCompanyId], references: [id], onDelete: SetNull)
+  clientCompanyId   String?
+  startDate         DateTime
+  endDate           DateTime? // NULL = ongoing
+  isVisible         Boolean              @default(true)
+  order             Int                  @default(0)
+  // Optional single illustration. A plain path/URL string (like Company.logoUrl
+  // and Skill.image): an uploaded `/uploads/...` path, a static `public/` ref,
+  // or an external URL. Resolved client-side via `mediaSrc`.
+  imageUrl          String?
+  skills            Skill[]              @relation("MissionSkills")
+  translations      MissionTranslation[]
+}
+
+model MissionTranslation {
+  id        String   @id @default(cuid())
+  locale    Locale
+  title     String
+  context   String?
+  tasks     String[] // ordered bullet points
+  mission   Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  missionId String
+
+  @@unique([missionId, locale])
+}
+
+// A job-title held at an employer over a date range. Several positions under one
+// employer express a title progression (e.g. Apprentice Dev → Engineer); a single
+// position is the title for the whole tenure. Independent of client missions.
+model Position {
+  id           String                @id @default(cuid())
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId    String
+  startDate    DateTime
+  endDate      DateTime? // NULL = current position
+  isVisible    Boolean               @default(true)
+  order        Int                   @default(0)
+  translations PositionTranslation[]
+}
+
+model PositionTranslation {
+  id         String   @id @default(cuid())
+  locale     Locale
+  title      String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionId String
+
+  @@unique([positionId, locale])
+}
+
+model Education {
+  id              String                 @id @default(cuid())
+  institutionName String
+  startDate       DateTime
+  endDate         DateTime?
+  logoUrl         String?
+  siteUrl         String?
+  isVisible       Boolean                @default(true)
+  order           Int                    @default(0)
+  translations    EducationTranslation[]
+}
+
+model EducationTranslation {
+  id          String    @id @default(cuid())
+  locale      Locale
+  degree      String
+  description String?
+  education   Education @relation(fields: [educationId], references: [id], onDelete: Cascade)
+  educationId String
+
+  @@unique([educationId, locale])
 }
 
 /* ---------------- CONTACT ---------------- */
@@ -252,6 +357,28 @@ model ResumeTranslation {
   url      String
   resume   Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   resumeId String
+}
+
+/* ---------------- CV GENERATION ---------------- */
+
+// Singleton config for the LaTeX CV generator. Distinct from `Resume` (the
+// manually-uploaded public CV): this stores WHICH portfolio data the generator
+// pulls (selection JSON) and WHERE the last generated PDFs live, so the
+// back-office remembers the choice between sessions. There is one row (the
+// service upserts the first/oldest). Generation reads existing content tables
+// (Profile, Company, Mission, Position, Education, Skill, Contact, Project),
+// renders a template, compiles with Tectonic, and writes a PDF under /uploads.
+model CvConfig {
+  id             String   @id @default(cuid())
+  // Template key resolved against src/cv/latex/templates (e.g. "international").
+  template       String   @default("international")
+  // { sections: { experience, education, skills, projects, contact },
+  //   includeIds: { companies, missions, education, skills, projects, contacts } }
+  selection      Json
+  // Last generated PDF per locale, as /uploads/<uuid>.pdf paths (served statically).
+  generatedFrUrl String?
+  generatedEnUrl String?
+  updatedAt      DateTime @updatedAt
 }
 
 /* ---------------- ALIAS (dynamic, per-locale JS bodies) ---------------- */

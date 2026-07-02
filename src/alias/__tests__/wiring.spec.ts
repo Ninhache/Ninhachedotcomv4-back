@@ -4,7 +4,6 @@ import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import configs from '../../config';
 import { ContactModule } from '../../contact/contact.module';
-import { ExperienceModule } from '../../experience/experience.module';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProfileModule } from '../../profile/profile.module';
 import { ProjectModule } from '../../project/project.module';
@@ -12,7 +11,7 @@ import { RevalidationInterceptor } from '../../revalidation/revalidation.interce
 import { RevalidationModule } from '../../revalidation/revalidation.module';
 import { SkillModule } from '../../skill/skill.module';
 
-// Regression: verifies the 5 public content controllers resolve AliasService
+// Regression: verifies the public content controllers resolve AliasService
 // (B3) and that the RevalidationInterceptor resolves RevalidationService (B4).
 // Prisma is stubbed; ConfigModule supplies the ConfigService both depend on.
 // (Avoids AppModule so the uuid v13 ESM/jest incompatibility in MediaModule
@@ -24,7 +23,6 @@ it('content controllers + revalidation interceptor resolve their deps', async ()
             ScheduleModule.forRoot(),
             RevalidationModule,
             ProjectModule,
-            ExperienceModule,
             ContactModule,
             ProfileModule,
             SkillModule,

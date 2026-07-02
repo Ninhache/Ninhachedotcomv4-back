@@ -22,20 +22,20 @@ export class CreateSkillTranslationDto {
 }
 
 export class CreateSkillDto {
-    @IsUrl({ require_tld: false }) 
-    @IsNotEmpty()
-    image: string;
+    // Optional now: skills migrated from the former TECH tag pool have no SVG
+    // yet; the author fills them in later from the admin.
+    // @IsString (not @IsUrl): accepts uploaded `/uploads/…` paths and static
+    // `public/` refs (e.g. `svg/skills/C.svg`), not just absolute URLs.
+    @IsOptional()
+    @IsString()
+    image?: string;
 
     @IsOptional()
-    @IsUrl({ require_tld: false }) 
+    @IsUrl({ require_tld: false })
     wikiUrl?: string;
 
     @IsBoolean()
     isVisible: boolean;
-
-    @IsArray()
-    @IsString({ each: true })
-    tagIds: string[];
 
     @IsArray()
     @IsString({ each: true })
