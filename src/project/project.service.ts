@@ -4,11 +4,20 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+// Blog cross-links are read alongside their translations so the front can
+// render the linked category/article's title without a second round-trip.
+const BLOG_LINK_INCLUDE = {
+    blogCategory: { include: { translations: true } },
+    blogArticle: { include: { translations: true } },
+} as const;
+
 type ProjectWithRelations = Prisma.ProjectGetPayload<{
     include: {
         media: true;
         skills: { include: { translations: true } };
         translations: true;
+        blogCategory: { include: { translations: true } };
+        blogArticle: { include: { translations: true } };
     };
 }>;
 
@@ -24,7 +33,9 @@ export class ProjectService {
             endDate: endDate ? endDate.toISOString() : null,
             medias: media,
             // Write side accepts ids; read side returns full objects. `natures`
-            // is a scalar enum array carried through `...rest`.
+            // is a scalar enum array carried through `...rest`. `blogCategory`/
+            // `blogArticle` (+ their *Id scalars) are likewise carried through
+            // `...rest` since they're part of the queried payload.
             skillIds: skills.map(s => s.id),
             skills,
         };
@@ -43,6 +54,8 @@ export class ProjectService {
             logoUrl,
             translations,
             isVisible,
+            blogCategoryId,
+            blogArticleId,
         } = createProjectDto;
 
         const project = await this.prismaService.project.create({
@@ -64,6 +77,13 @@ export class ProjectService {
                     ? { connect: mediaIds.map(id => ({ id })) }
                     : undefined,
 
+                blogCategory: blogCategoryId
+                    ? { connect: { id: blogCategoryId } }
+                    : undefined,
+                blogArticle: blogArticleId
+                    ? { connect: { id: blogArticleId } }
+                    : undefined,
+
                 translations: translations?.length
                     ? {
                           create: translations.map(t => ({
@@ -79,6 +99,7 @@ export class ProjectService {
                 media: true,
                 skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
@@ -91,6 +112,7 @@ export class ProjectService {
                 media: true,
                 skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
             orderBy: { startDate: 'desc' },
         });
@@ -105,6 +127,7 @@ export class ProjectService {
                 media: true,
                 skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
@@ -154,11 +177,27 @@ export class ProjectService {
                     dto.mediaIds !== undefined
                         ? { set: dto.mediaIds.map(id => ({ id })) }
                         : undefined,
+
+                // 3-state: omitted → leave unchanged; empty string/undefined
+                // handled by the `?` check → clear the link; an id → connect.
+                blogCategory:
+                    dto.blogCategoryId === undefined
+                        ? undefined
+                        : dto.blogCategoryId
+                          ? { connect: { id: dto.blogCategoryId } }
+                          : { disconnect: true },
+                blogArticle:
+                    dto.blogArticleId === undefined
+                        ? undefined
+                        : dto.blogArticleId
+                          ? { connect: { id: dto.blogArticleId } }
+                          : { disconnect: true },
             },
             include: {
                 media: true,
                 skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
