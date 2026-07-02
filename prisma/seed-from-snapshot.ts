@@ -85,7 +85,73 @@ async function main() {
         });
     }
 
-    // 3. Projects (depend on skills) ----------------------------------------
+    // 2b. Article categories (no deps) --------------------------------------
+    for (const c of snapshot.articleCategories ?? []) {
+        const translations = c.translations.map((tr: Tr) => ({
+            id: tr.id,
+            locale: tr.locale,
+            name: tr.name,
+        }));
+        await prisma.articleCategory.upsert({
+            where: { id: c.id },
+            create: {
+                id: c.id,
+                slug: c.slug,
+                isVisible: c.isVisible,
+                order: c.order ?? 0,
+                translations: { create: translations },
+            },
+            update: {
+                slug: c.slug,
+                isVisible: c.isVisible,
+                order: c.order ?? 0,
+                translations: { deleteMany: {}, create: translations },
+            },
+        });
+    }
+
+    // 2c. Articles (depend on article categories) ---------------------------
+    for (const a of snapshot.articles ?? []) {
+        const translations = a.translations.map((tr: Tr) => ({
+            id: tr.id,
+            locale: tr.locale,
+            title: tr.title,
+            excerpt: tr.excerpt,
+            body: tr.body,
+        }));
+        // explicit join rows carrying the per-category order
+        const categoryLinks = (a.categoryLinks ?? []).map(
+            (l: { categoryId: string; order: number }) => ({
+                order: l.order,
+                category: { connect: { id: l.categoryId } },
+            })
+        );
+        const scalars = {
+            slug: a.slug,
+            isVisible: a.isVisible,
+            publishedAt: date(a.publishedAt),
+            coverImageUrl: a.coverImageUrl ?? null,
+            order: a.order ?? 0,
+        };
+        await prisma.article.upsert({
+            where: { id: a.id },
+            create: {
+                id: a.id,
+                ...scalars,
+                tags: a.tags ?? [],
+                categoryLinks: { create: categoryLinks },
+                translations: { create: translations },
+            },
+            update: {
+                ...scalars,
+                tags: { set: a.tags ?? [] },
+                categoryLinks: { deleteMany: {}, create: categoryLinks },
+                translations: { deleteMany: {}, create: translations },
+            },
+        });
+    }
+
+    // 3. Projects (depend on skills + article categories/articles) ----------
     for (const p of snapshot.projects ?? []) {
         const translations = p.translations.map((tr: Tr) => ({
             id: tr.id,
@@ -109,12 +175,24 @@ async function main() {
                 id: p.id,
                 ...scalars,
                 natures: p.natures ?? [],
+                ...(p.blogCategoryId
+                    ? { blogCategory: { connect: { id: p.blogCategoryId } } }
+                    : {}),
+                ...(p.blogArticleId
+                    ? { blogArticle: { connect: { id: p.blogArticleId } } }
+                    : {}),
                 skills: { connect: ids(p.skillIds) },
                 translations: { create: translations },
             },
             update: {
                 ...scalars,
                 natures: { set: p.natures ?? [] },
+                blogCategory: p.blogCategoryId
+                    ? { connect: { id: p.blogCategoryId } }
+                    : { disconnect: true },
+                blogArticle: p.blogArticleId
+                    ? { connect: { id: p.blogArticleId } }
+                    : { disconnect: true },
                 skills: { set: ids(p.skillIds) },
                 translations: { deleteMany: {}, create: translations },
             },
@@ -380,6 +458,8 @@ async function main() {
     const total = [
         'skillCategories',
         'skills',
+        'articleCategories',
+        'articles',
         'projects',
         'media',
         'companies',

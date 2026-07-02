@@ -33,6 +33,18 @@ async function main() {
         },
         orderBy: { id: 'asc' },
     });
+    // Blog: article categories (managed taxonomy) + articles (Markdown bodies).
+    const articleCategories = await prisma.articleCategory.findMany({
+        include: { translations: true },
+        orderBy: { id: 'asc' },
+    });
+    const articles = await prisma.article.findMany({
+        include: {
+            translations: true,
+            categoryLinks: { select: { categoryId: true, order: true } },
+        },
+        orderBy: { id: 'asc' },
+    });
     const projects = await prisma.project.findMany({
         include: {
             translations: true,
@@ -112,6 +124,37 @@ async function main() {
                 name: tr.name,
             })),
         })),
+        articleCategories: articleCategories.map(c => ({
+            id: c.id,
+            slug: c.slug,
+            isVisible: c.isVisible,
+            order: c.order,
+            translations: c.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                name: tr.name,
+            })),
+        })),
+        articles: articles.map(a => ({
+            id: a.id,
+            slug: a.slug,
+            isVisible: a.isVisible,
+            publishedAt: iso(a.publishedAt),
+            coverImageUrl: a.coverImageUrl,
+            tags: a.tags,
+            order: a.order,
+            categoryLinks: a.categoryLinks.map(l => ({
+                categoryId: l.categoryId,
+                order: l.order,
+            })),
+            translations: a.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                title: tr.title,
+                excerpt: tr.excerpt,
+                body: tr.body,
+            })),
+        })),
         projects: projects.map(p => ({
             id: p.id,
             startDate: p.startDate.toISOString(),
@@ -121,6 +164,9 @@ async function main() {
             visitUrl: p.visitUrl,
             playUrl: p.playUrl,
             logoUrl: p.logoUrl,
+            // Optional blog cross-links (category + flagship article).
+            blogCategoryId: p.blogCategoryId,
+            blogArticleId: p.blogArticleId,
             // Tech stack + project nature (formerly TECH/QUAL tags).
             skillIds: p.skills.map(x => x.id),
             natures: p.natures,

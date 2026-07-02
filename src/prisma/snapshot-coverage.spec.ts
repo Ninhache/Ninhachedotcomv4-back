@@ -26,6 +26,7 @@ import { join } from 'path';
 const NOT_SNAPSHOTTED = new Set<string>([
     'User', // excluded by design — bootstrap admin via POST /auth/register
     'SkillOnCategory', // join table, written via Skill.categoryLinks nested create
+    'ArticleOnCategory', // join table, written via Article.categoryLinks nested create
     'AliasBody', // written via Alias.bodies nested create
     // CV generator config: its generated*Url fields point at physical uploads
     // PDFs that the snapshot never captures, so restoring it would dangle.
