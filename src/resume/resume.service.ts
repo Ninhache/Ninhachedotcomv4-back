@@ -16,11 +16,30 @@ export class ResumeService {
     async create(
         localeFiles: { locale: 'fr' | 'en'; file: Express.Multer.File }[]
     ): Promise<ResumeDto> {
-        // Multer has already written the new files to disk by the time we get
-        // here. We must not delete the old resume's files until the new record
-        // is safely committed, otherwise a DB failure would leave the system
-        // with no resume at all (old files gone, new record never written).
-        const newFilenames = localeFiles.map(({ file }) => file.filename);
+        return this.promoteFromFilenames(
+            localeFiles.map(({ locale, file }) => ({
+                locale,
+                filename: file.filename,
+            }))
+        );
+    }
+
+    /**
+     * Make the given already-written `uploads/` files the current public Resume.
+     * Shared by the multipart upload (POST /resume) and the LaTeX CV generator
+     * (POST /cv/generate?publish). The files must already exist on disk.
+     *
+     * @param localeFiles one `{ locale, filename }` per locale to publish
+     * @returns the freshly created Resume with its translations
+     */
+    async promoteFromFilenames(
+        localeFiles: { locale: 'fr' | 'en'; filename: string }[]
+    ): Promise<ResumeDto> {
+        // The new files are already on disk by the time we get here. We must not
+        // delete the old resume's files until the new record is safely
+        // committed, otherwise a DB failure would leave the system with no
+        // resume at all (old files gone, new record never written).
+        const newFilenames = localeFiles.map(({ filename }) => filename);
 
         try {
             const { resume, oldUrls } = await this.prismaService.$transaction(
@@ -37,10 +56,12 @@ export class ResumeService {
                     const resume = await tx.resume.create({
                         data: {
                             translations: {
-                                create: localeFiles.map(({ locale, file }) => ({
-                                    locale: locale as Locale,
-                                    url: this.buildUrl(file.filename),
-                                })),
+                                create: localeFiles.map(
+                                    ({ locale, filename }) => ({
+                                        locale: locale as Locale,
+                                        url: this.buildUrl(filename),
+                                    })
+                                ),
                             },
                         },
                         include: { translations: true },

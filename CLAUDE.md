@@ -21,6 +21,9 @@ yarn test:e2e           # jest with test/jest-e2e.json
 npx prisma migrate dev          # apply/create migrations against DATABASE_URL
 npx prisma generate             # regenerate the Prisma client after schema edits
 npx prisma db seed              # runs prisma/seed.ts (ts-node)
+
+yarn db:dump                    # snapshot the live DB → prisma/snapshot.json (dump-seed.ts)
+yarn db:restore                 # replay prisma/snapshot.json into the DB (seed-from-snapshot.ts)
 ```
 
 Docker (full stack incl. Postgres):
@@ -28,6 +31,52 @@ Docker (full stack incl. Postgres):
 docker compose up --build
 docker compose exec backend npx prisma migrate dev
 ```
+
+## Content snapshot workflow (local ⇄ live)
+
+This is how the author promotes content edits: tweak the portfolio **locally** (admin
+dashboard / DB), and when happy, push that content to the **live** site. The mechanism is a
+pair of ts-node scripts that round-trip the whole DB through `prisma/snapshot.json`:
+
+- `prisma/dump-seed.ts` (`yarn db:dump`) — reads every content table via Prisma and writes
+  `prisma/snapshot.json`. Values are captured **raw** (alias `@@` tokens and `<projects>…`
+  markers are NOT resolved); real ids are preserved so replay is idempotent (upsert by id).
+  `User` rows are excluded (bootstrap admin via `POST /auth/register`); physical `uploads/`
+  files are not captured, only the rows referencing them.
+- `prisma/seed-from-snapshot.ts` (`yarn db:restore`) — replays `snapshot.json` into the DB.
+  Upsert-only/non-destructive: rows absent from the snapshot are left untouched. Parents are
+  written before dependents to satisfy FKs (skills → projects/companies/missions → positions;
+  EMPLOYER companies before the CLIENT rows that point at them via `parentEmployerId`).
+
+Typical promotion: edit locally → `yarn db:dump` → commit `snapshot.json` → on the live host
+pull + `yarn db:restore`.
+
+> ⚠️ **These two scripts mirror the schema by hand and MUST be updated whenever the data model
+> changes.** They enumerate every model, field, and relation explicitly — Prisma does not keep
+> them in sync. When you add/remove a model, field, or relation in `schema.prisma`:
+> 1. **`dump-seed.ts`** — add/remove the `findMany` query + its `snapshot.*` mapping (capture
+>    new scalar fields and relation id-lists, e.g. `skillIds`).
+> 2. **`seed-from-snapshot.ts`** — add/remove the matching `upsert`, in **FK-dependency order**
+>    (parents first; mind self-FKs like `Company.parentEmployerId`), and update the final
+>    summary list.
+> 3. Keep both **in lockstep** — they share the `snapshot.json` shape; changing one alone breaks
+>    restore. Typecheck with `npx tsc --noEmit --skipLibCheck prisma/dump-seed.ts prisma/seed-from-snapshot.ts`.
+> 4. Then regenerate: `yarn db:dump` (ideally after a backup, since it overwrites the committed
+>    `snapshot.json`).
+>
+> **Automated guard:** `src/prisma/snapshot-coverage.spec.ts` (runs in `yarn test` / CI) parses
+> `schema.prisma` and asserts every content model is referenced in BOTH scripts. The compiler
+> already catches *removed/renamed* models (the scripts stop compiling); this test catches the
+> silent case — an *added* model the scripts don't yet cover. When it fails, either wire the model
+> into both scripts (fix 1/2 above) or add it to the test's `NOT_SNAPSHOTTED` allowlist with a
+> reason if it's intentionally excluded.
+>
+> If a script references a model/field that no longer exists, it won't even compile — that's the
+> signal it has drifted (this happened after the Skill/Tag merge and the Timeline addition).
+> The **other** seeders — `prisma/seed.ts`, `prisma/seed-projects.ts` (seed from the legacy
+> frontend JSON) and `prisma/migrate-experiences-to-timeline.ts` (one-shot migration) — have the
+> same hand-mirrored-schema fragility; treat the migration script as frozen, but the JSON
+> seeders need the same care if you still rely on them.
 
 ## Architecture
 

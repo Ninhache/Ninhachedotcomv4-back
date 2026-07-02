@@ -3,13 +3,15 @@
  *
  * Idempotent: every row is upserted by its real id, so re-running creates what's
  * missing and updates what exists — no duplicates. Relations are restored by id
- * (`connect`/`set`). Parents are written before dependents so foreign keys hold.
+ * (`connect`/`set`). Parents are written before dependents so foreign keys hold
+ * (skills → projects/companies/missions; companies → missions/positions; and
+ * EMPLOYER companies before the CLIENT rows that point at them via parentEmployerId).
  *
  * Upsert-only: rows present in the DB but absent from the snapshot are left
  * untouched (non-destructive). Values are written verbatim — alias `@@` tokens
  * stay raw. `User` rows are not part of the snapshot.
  *
- * Run:  npx ts-node prisma/seed-from-snapshot.ts
+ * Run:  npx ts-node prisma/seed-from-snapshot.ts   (yarn db:restore)
  */
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
@@ -18,40 +20,16 @@ import { join } from 'path';
 const prisma = new PrismaClient();
 
 type Tr = Record<string, unknown> & { id: string; locale: string };
-const ids = (xs: string[]) => xs.map(id => ({ id }));
+const ids = (xs: string[] = []) => xs.map(id => ({ id }));
+const date = (s: string | null | undefined) => (s ? new Date(s) : null);
 
 async function main() {
     const snapshot = JSON.parse(
         readFileSync(join(__dirname, 'snapshot.json'), 'utf8')
     );
 
-    // 1. Tags (no deps) ------------------------------------------------------
-    for (const t of snapshot.tags) {
-        const translations = t.translations.map((tr: Tr) => ({
-            id: tr.id,
-            locale: tr.locale,
-            name: tr.name,
-        }));
-        await prisma.tag.upsert({
-            where: { id: t.id },
-            create: {
-                id: t.id,
-                type: t.type,
-                isVisible: t.isVisible,
-                hexColor: t.hexColor,
-                translations: { create: translations },
-            },
-            update: {
-                type: t.type,
-                isVisible: t.isVisible,
-                hexColor: t.hexColor,
-                translations: { deleteMany: {}, create: translations },
-            },
-        });
-    }
-
-    // 2. Skill categories (no deps) -----------------------------------------
-    for (const c of snapshot.skillCategories) {
+    // 1. Skill categories (no deps) -----------------------------------------
+    for (const c of snapshot.skillCategories ?? []) {
         const translations = c.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -73,8 +51,8 @@ async function main() {
         });
     }
 
-    // 3. Skills (depend on tags + categories) -------------------------------
-    for (const s of snapshot.skills) {
+    // 2. Skills (depend on categories) --------------------------------------
+    for (const s of snapshot.skills ?? []) {
         const translations = s.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -94,7 +72,6 @@ async function main() {
                 image: s.image,
                 wikiUrl: s.wikiUrl,
                 isVisible: s.isVisible,
-                tags: { connect: ids(s.tagIds) },
                 categoryLinks: { create: categoryLinks },
                 translations: { create: translations },
             },
@@ -102,15 +79,14 @@ async function main() {
                 image: s.image,
                 wikiUrl: s.wikiUrl,
                 isVisible: s.isVisible,
-                tags: { set: ids(s.tagIds) },
                 categoryLinks: { deleteMany: {}, create: categoryLinks },
                 translations: { deleteMany: {}, create: translations },
             },
         });
     }
 
-    // 4. Projects (depend on tags) ------------------------------------------
-    for (const p of snapshot.projects) {
+    // 3. Projects (depend on skills) ----------------------------------------
+    for (const p of snapshot.projects ?? []) {
         const translations = p.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -120,7 +96,7 @@ async function main() {
         }));
         const scalars = {
             startDate: new Date(p.startDate),
-            endDate: p.endDate ? new Date(p.endDate) : null,
+            endDate: date(p.endDate),
             isVisible: p.isVisible,
             gitUrl: p.gitUrl,
             visitUrl: p.visitUrl,
@@ -132,27 +108,28 @@ async function main() {
             create: {
                 id: p.id,
                 ...scalars,
-                techTags: { connect: ids(p.techTagIds) },
-                qualTags: { connect: ids(p.qualTagIds) },
+                natures: p.natures ?? [],
+                skills: { connect: ids(p.skillIds) },
                 translations: { create: translations },
             },
             update: {
                 ...scalars,
-                techTags: { set: ids(p.techTagIds) },
-                qualTags: { set: ids(p.qualTagIds) },
+                natures: { set: p.natures ?? [] },
+                skills: { set: ids(p.skillIds) },
                 translations: { deleteMany: {}, create: translations },
             },
         });
     }
 
-    // 5. Media (depend on projects) -----------------------------------------
-    for (const m of snapshot.media) {
+    // 4. Media (depend on projects) -----------------------------------------
+    for (const m of snapshot.media ?? []) {
         const scalars = {
             mediaUrl: m.mediaUrl,
             type: m.type,
             originalName: m.originalName,
             mimeType: m.mimeType,
             alt: m.alt,
+            order: m.order ?? 0,
         };
         await prisma.media.upsert({
             where: { id: m.id },
@@ -172,43 +149,154 @@ async function main() {
         });
     }
 
-    // 6. Experiences (depend on tags) ---------------------------------------
-    for (const e of snapshot.experiences) {
-        const translations = e.translations.map((tr: Tr) => ({
+    // 5. Companies (depend on skills; self-FK parentEmployerId) --------------
+    // EMPLOYER rows (parentEmployerId = null) first so CLIENT rows can connect.
+    const companies = [...(snapshot.companies ?? [])].sort(
+        (a, b) => (a.parentEmployerId ? 1 : 0) - (b.parentEmployerId ? 1 : 0)
+    );
+    for (const c of companies) {
+        const translations = c.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
-            jobTitle: tr.jobTitle,
             description: tr.description,
         }));
         const scalars = {
-            startDate: new Date(e.startDate),
-            endDate: new Date(e.endDate),
-            contractType: e.contractType,
-            localisation: e.localisation,
-            isVisible: e.isVisible,
-            siteUrl: e.siteUrl,
-            imageUrl: e.imageUrl,
-            order: e.order,
-            companyName: e.companyName,
+            kind: c.kind,
+            name: c.name,
+            localisation: c.localisation,
+            siteUrl: c.siteUrl,
+            backgroundUrl: c.backgroundUrl ?? null,
+            logoUrl: c.logoUrl,
+            isVisible: c.isVisible,
+            order: c.order ?? 0,
+            contractType: c.contractType ?? null,
+            employmentStart: date(c.employmentStart),
+            employmentEnd: date(c.employmentEnd),
         };
-        await prisma.experience.upsert({
-            where: { id: e.id },
+        await prisma.company.upsert({
+            where: { id: c.id },
             create: {
-                id: e.id,
+                id: c.id,
                 ...scalars,
-                tags: { connect: ids(e.tagIds) },
+                ...(c.parentEmployerId
+                    ? { parentEmployer: { connect: { id: c.parentEmployerId } } }
+                    : {}),
+                skills: { connect: ids(c.skillIds) },
                 translations: { create: translations },
             },
             update: {
                 ...scalars,
-                tags: { set: ids(e.tagIds) },
+                parentEmployer: c.parentEmployerId
+                    ? { connect: { id: c.parentEmployerId } }
+                    : { disconnect: true },
+                skills: { set: ids(c.skillIds) },
                 translations: { deleteMany: {}, create: translations },
             },
         });
     }
 
-    // 7. Contacts (no deps) -------------------------------------------------
-    for (const c of snapshot.contacts) {
+    // 6. Missions (depend on companies + skills) ----------------------------
+    for (const m of snapshot.missions ?? []) {
+        const translations = m.translations.map((tr: Tr) => ({
+            id: tr.id,
+            locale: tr.locale,
+            title: tr.title,
+            context: tr.context,
+            tasks: (tr.tasks as string[]) ?? [],
+        }));
+        const scalars = {
+            startDate: new Date(m.startDate),
+            endDate: date(m.endDate),
+            isVisible: m.isVisible,
+            order: m.order ?? 0,
+            imageUrl: m.imageUrl,
+        };
+        await prisma.mission.upsert({
+            where: { id: m.id },
+            create: {
+                id: m.id,
+                ...scalars,
+                employerCompany: { connect: { id: m.employerCompanyId } },
+                ...(m.clientCompanyId
+                    ? { clientCompany: { connect: { id: m.clientCompanyId } } }
+                    : {}),
+                skills: { connect: ids(m.skillIds) },
+                translations: { create: translations },
+            },
+            update: {
+                ...scalars,
+                employerCompany: { connect: { id: m.employerCompanyId } },
+                clientCompany: m.clientCompanyId
+                    ? { connect: { id: m.clientCompanyId } }
+                    : { disconnect: true },
+                skills: { set: ids(m.skillIds) },
+                translations: { deleteMany: {}, create: translations },
+            },
+        });
+    }
+
+    // 7. Positions (depend on companies) ------------------------------------
+    for (const p of snapshot.positions ?? []) {
+        const translations = p.translations.map((tr: Tr) => ({
+            id: tr.id,
+            locale: tr.locale,
+            title: tr.title,
+        }));
+        const scalars = {
+            startDate: new Date(p.startDate),
+            endDate: date(p.endDate),
+            isVisible: p.isVisible,
+            order: p.order ?? 0,
+        };
+        await prisma.position.upsert({
+            where: { id: p.id },
+            create: {
+                id: p.id,
+                ...scalars,
+                company: { connect: { id: p.companyId } },
+                translations: { create: translations },
+            },
+            update: {
+                ...scalars,
+                company: { connect: { id: p.companyId } },
+                translations: { deleteMany: {}, create: translations },
+            },
+        });
+    }
+
+    // 8. Education (no deps) -------------------------------------------------
+    for (const e of snapshot.educations ?? []) {
+        const translations = e.translations.map((tr: Tr) => ({
+            id: tr.id,
+            locale: tr.locale,
+            degree: tr.degree,
+            description: tr.description ?? null,
+        }));
+        const scalars = {
+            institutionName: e.institutionName,
+            startDate: new Date(e.startDate),
+            endDate: date(e.endDate),
+            logoUrl: e.logoUrl,
+            siteUrl: e.siteUrl,
+            isVisible: e.isVisible,
+            order: e.order ?? 0,
+        };
+        await prisma.education.upsert({
+            where: { id: e.id },
+            create: {
+                id: e.id,
+                ...scalars,
+                translations: { create: translations },
+            },
+            update: {
+                ...scalars,
+                translations: { deleteMany: {}, create: translations },
+            },
+        });
+    }
+
+    // 9. Contacts (no deps) -------------------------------------------------
+    for (const c of snapshot.contacts ?? []) {
         const translations = c.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -234,8 +322,8 @@ async function main() {
         });
     }
 
-    // 8. Profile (singleton-ish) --------------------------------------------
-    for (const p of snapshot.profiles) {
+    // 10. Profile (singleton-ish) -------------------------------------------
+    for (const p of snapshot.profiles ?? []) {
         const translations = p.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -261,8 +349,8 @@ async function main() {
         });
     }
 
-    // 9. Resume -------------------------------------------------------------
-    for (const r of snapshot.resumes) {
+    // 11. Resume ------------------------------------------------------------
+    for (const r of snapshot.resumes ?? []) {
         const translations = r.translations.map((tr: Tr) => ({
             id: tr.id,
             locale: tr.locale,
@@ -275,8 +363,8 @@ async function main() {
         });
     }
 
-    // 10. Aliases (no deps) -------------------------------------------------
-    for (const a of snapshot.aliases) {
+    // 12. Aliases (no deps) -------------------------------------------------
+    for (const a of snapshot.aliases ?? []) {
         const bodies = a.bodies.map((b: Tr & { code: string }) => ({
             id: b.id,
             locale: b.locale,
@@ -290,18 +378,20 @@ async function main() {
     }
 
     const total = [
-        'tags',
         'skillCategories',
         'skills',
         'projects',
         'media',
-        'experiences',
+        'companies',
+        'missions',
+        'positions',
+        'educations',
         'contacts',
         'profiles',
         'resumes',
         'aliases',
     ]
-        .map(k => `${snapshot[k].length} ${k}`)
+        .map(k => `${(snapshot[k] ?? []).length} ${k}`)
         .join(', ');
     console.log(`✅ Restored from snapshot: ${total}`);
 }

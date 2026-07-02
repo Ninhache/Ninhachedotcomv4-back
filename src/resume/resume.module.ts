@@ -7,5 +7,7 @@ import { ResumeService } from './resume.service';
   imports: [PrismaModule],
   controllers: [ResumeController],
   providers: [ResumeService],
+  // Exported so CvModule can promote a generated PDF to the public Resume.
+  exports: [ResumeService],
 })
 export class ResumeModule {}

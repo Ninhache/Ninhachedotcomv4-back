@@ -13,7 +13,7 @@ import { Locale, PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const ageBody =
-    "return Math.floor((Date.now() - new Date('2002-05-12')) / 3.15576e10);";
+    "return Math.floor((Date.now() - new Date('2002-06-27')) / 3.15576e10);";
 const exampleBody = 'return $.age % 4;';
 const greetFr =
     "const h=+new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hour12:false,timeZone:'Europe/Paris'}).format(new Date()); return ['Bonsoir','Bonjour','Bon apres-midi','Bonsoir'][h<6?0:h<12?1:h<18?2:3];";

@@ -1,9 +1,7 @@
-import { Tag } from 'src/tags/entities/tag.entity';
-
 export class Skill {
   id: string;
   name: string;
-  image: string;
+  image: string | null;
   wikiUrl?: string;
-  tags: Tag[];
+  isVisible: boolean;
 }

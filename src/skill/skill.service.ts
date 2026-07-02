@@ -14,7 +14,6 @@ export class SkillService {
 
     private skillInclude: Prisma.SkillInclude = {
         categoryLinks: { include: { category: { include: { translations: true } } } },
-        tags: { include: { translations: true } },
         translations: true,
     };
 
@@ -28,9 +27,6 @@ export class SkillService {
                     skill: {
                         include: {
                             translations: true,
-                            // tag translations are needed so the frontend can build
-                            // each tag's nameByLocale on the public skills view.
-                            tags: { include: { translations: true } },
                         },
                     },
                 },
@@ -88,7 +84,7 @@ export class SkillService {
     // ---- Skills -------------------------------------------------------------
 
     async create(createSkillDto: CreateSkillDto) {
-        const { categoryIds, image, isVisible, tagIds, translations, wikiUrl } =
+        const { categoryIds, image, isVisible, translations, wikiUrl } =
             createSkillDto;
 
         return this.prismaService.$transaction(async tx => {
@@ -103,7 +99,6 @@ export class SkillService {
                             name: t.name,
                         })),
                     },
-                    tags: { connect: tagIds.map(id => ({ id })) },
                 },
             });
             await this.syncCategoryLinks(tx, created.id, categoryIds);
@@ -136,7 +131,7 @@ export class SkillService {
     }
 
     async update(id: string, updateSkillDto: UpdateSkillDto) {
-        const { categoryIds, image, isVisible, tagIds, translations, wikiUrl } =
+        const { categoryIds, image, isVisible, translations, wikiUrl } =
             updateSkillDto;
 
         return this.prismaService.$transaction(async tx => {
@@ -146,13 +141,8 @@ export class SkillService {
                     image,
                     isVisible,
                     wikiUrl,
-                    // Only touch a relation when its ids were actually provided,
-                    // so a partial PATCH doesn't silently clear tags or wipe every
-                    // translation (deleteMany with no create).
-                    tags:
-                        tagIds !== undefined
-                            ? { set: tagIds.map(id => ({ id })) }
-                            : undefined,
+                    // Only touch translations when provided, so a partial PATCH
+                    // doesn't wipe every translation (deleteMany with no create).
                     translations:
                         translations !== undefined
                             ? {

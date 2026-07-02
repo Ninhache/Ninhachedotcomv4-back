@@ -26,7 +26,9 @@ export class CreateContactDto {
     @IsUrl({ require_tld: false })
     contactUrl: string;
 
-    @IsUrl({ require_tld: false })
+    // @IsString (not @IsUrl): accepts uploaded `/uploads/…` paths and static
+    // `public/` refs, not just absolute URLs.
+    @IsString()
     imageUrl: string;
 
     @IsBoolean()

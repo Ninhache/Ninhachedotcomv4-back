@@ -6,7 +6,7 @@ export interface RevalidateMeta {
     /**
      * Base cache tag(s), e.g. 'projects' — each is expanded to `<entity>` +
      * `<entity>:<locale>`. Pass an array when a mutation affects several cached
-     * surfaces (e.g. editing a tag, which appears in projects/skills/experiences).
+     * surfaces (e.g. editing a tag, which appears in projects/skills/missions).
      */
     entity: string | string[];
     /** Also invalidate the locale-agnostic 'greeting' tag (home/hero content). */
