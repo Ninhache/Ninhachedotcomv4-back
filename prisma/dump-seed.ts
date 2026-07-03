@@ -11,7 +11,7 @@
  * POST /auth/register). Physical upload files under uploads/ are NOT captured
  * here — only the DB rows that reference them.
  *
- * Run:  npx ts-node prisma/dump-seed.ts
+ * Run:  npx ts-node prisma/dump-seed.ts   (yarn db:dump)
  */
 import { PrismaClient } from '@prisma/client';
 import { writeFileSync } from 'fs';
@@ -19,11 +19,9 @@ import { join } from 'path';
 
 const prisma = new PrismaClient();
 
+const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
+
 async function main() {
-    const tags = await prisma.tag.findMany({
-        include: { translations: true },
-        orderBy: { id: 'asc' },
-    });
     const skillCategories = await prisma.skillCategory.findMany({
         include: { translations: true },
         orderBy: { id: 'asc' },
@@ -31,7 +29,18 @@ async function main() {
     const skills = await prisma.skill.findMany({
         include: {
             translations: true,
-            tags: { select: { id: true } },
+            categoryLinks: { select: { categoryId: true, order: true } },
+        },
+        orderBy: { id: 'asc' },
+    });
+    // Blog: article categories (managed taxonomy) + articles (Markdown bodies).
+    const articleCategories = await prisma.articleCategory.findMany({
+        include: { translations: true },
+        orderBy: { id: 'asc' },
+    });
+    const articles = await prisma.article.findMany({
+        include: {
+            translations: true,
             categoryLinks: { select: { categoryId: true, order: true } },
         },
         orderBy: { id: 'asc' },
@@ -39,14 +48,33 @@ async function main() {
     const projects = await prisma.project.findMany({
         include: {
             translations: true,
-            techTags: { select: { id: true } },
-            qualTags: { select: { id: true } },
+            // Tech stack = skills (the unified tech entity; formerly TECH tags).
+            skills: { select: { id: true } },
         },
         orderBy: { id: 'asc' },
     });
     const media = await prisma.media.findMany({ orderBy: { id: 'asc' } });
-    const experiences = await prisma.experience.findMany({
-        include: { translations: true, tags: { select: { id: true } } },
+    // Timeline: companies (employers + clients), missions, positions.
+    const companies = await prisma.company.findMany({
+        include: {
+            translations: true,
+            skills: { select: { id: true } },
+        },
+        orderBy: { id: 'asc' },
+    });
+    const missions = await prisma.mission.findMany({
+        include: {
+            translations: true,
+            skills: { select: { id: true } },
+        },
+        orderBy: { id: 'asc' },
+    });
+    const positions = await prisma.position.findMany({
+        include: { translations: true },
+        orderBy: { id: 'asc' },
+    });
+    const educations = await prisma.education.findMany({
+        include: { translations: true },
         orderBy: { id: 'asc' },
     });
     const contacts = await prisma.contact.findMany({
@@ -71,17 +99,6 @@ async function main() {
             note: 'DB snapshot — raw values, alias @@ tokens are NOT resolved. Replay with seed-from-snapshot.ts.',
             users: 'excluded (bootstrap admin via POST /auth/register)',
         },
-        tags: tags.map(t => ({
-            id: t.id,
-            type: t.type,
-            isVisible: t.isVisible,
-            hexColor: t.hexColor,
-            translations: t.translations.map(tr => ({
-                id: tr.id,
-                locale: tr.locale,
-                name: tr.name,
-            })),
-        })),
         skillCategories: skillCategories.map(c => ({
             id: c.id,
             isVisible: c.isVisible,
@@ -97,7 +114,6 @@ async function main() {
             image: s.image,
             wikiUrl: s.wikiUrl,
             isVisible: s.isVisible,
-            tagIds: s.tags.map(x => x.id),
             categoryLinks: s.categoryLinks.map(l => ({
                 categoryId: l.categoryId,
                 order: l.order,
@@ -108,17 +124,52 @@ async function main() {
                 name: tr.name,
             })),
         })),
+        articleCategories: articleCategories.map(c => ({
+            id: c.id,
+            slug: c.slug,
+            isVisible: c.isVisible,
+            order: c.order,
+            translations: c.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                name: tr.name,
+            })),
+        })),
+        articles: articles.map(a => ({
+            id: a.id,
+            slug: a.slug,
+            isVisible: a.isVisible,
+            publishedAt: iso(a.publishedAt),
+            coverImageUrl: a.coverImageUrl,
+            tags: a.tags,
+            order: a.order,
+            categoryLinks: a.categoryLinks.map(l => ({
+                categoryId: l.categoryId,
+                order: l.order,
+            })),
+            translations: a.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                title: tr.title,
+                excerpt: tr.excerpt,
+                body: tr.body,
+            })),
+        })),
         projects: projects.map(p => ({
             id: p.id,
             startDate: p.startDate.toISOString(),
-            endDate: p.endDate ? p.endDate.toISOString() : null,
+            endDate: iso(p.endDate),
             isVisible: p.isVisible,
             gitUrl: p.gitUrl,
             visitUrl: p.visitUrl,
             playUrl: p.playUrl,
             logoUrl: p.logoUrl,
-            techTagIds: p.techTags.map(x => x.id),
-            qualTagIds: p.qualTags.map(x => x.id),
+            // Optional blog cross-links (category + flagship article).
+            blogCategoryId: p.blogCategoryId,
+            blogArticleId: p.blogArticleId,
+            // Tech stack + project nature (formerly TECH/QUAL tags).
+            skillIds: p.skills.map(x => x.id),
+            natures: p.natures,
             translations: p.translations.map(tr => ({
                 id: tr.id,
                 locale: tr.locale,
@@ -134,24 +185,76 @@ async function main() {
             originalName: m.originalName,
             mimeType: m.mimeType,
             alt: m.alt,
+            order: m.order,
             projectId: m.projectId,
         })),
-        experiences: experiences.map(e => ({
+        companies: companies.map(c => ({
+            id: c.id,
+            kind: c.kind,
+            name: c.name,
+            localisation: c.localisation,
+            siteUrl: c.siteUrl,
+            backgroundUrl: c.backgroundUrl,
+            logoUrl: c.logoUrl,
+            isVisible: c.isVisible,
+            order: c.order,
+            contractType: c.contractType,
+            employmentStart: iso(c.employmentStart),
+            employmentEnd: iso(c.employmentEnd),
+            // CLIENT-only: the employer this client was engaged through.
+            parentEmployerId: c.parentEmployerId,
+            // EMPLOYER-level curated card skills.
+            skillIds: c.skills.map(x => x.id),
+            translations: c.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                description: tr.description,
+            })),
+        })),
+        missions: missions.map(m => ({
+            id: m.id,
+            employerCompanyId: m.employerCompanyId,
+            clientCompanyId: m.clientCompanyId,
+            startDate: m.startDate.toISOString(),
+            endDate: iso(m.endDate),
+            isVisible: m.isVisible,
+            order: m.order,
+            imageUrl: m.imageUrl,
+            skillIds: m.skills.map(x => x.id),
+            translations: m.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                title: tr.title,
+                context: tr.context,
+                tasks: tr.tasks,
+            })),
+        })),
+        positions: positions.map(p => ({
+            id: p.id,
+            companyId: p.companyId,
+            startDate: p.startDate.toISOString(),
+            endDate: iso(p.endDate),
+            isVisible: p.isVisible,
+            order: p.order,
+            translations: p.translations.map(tr => ({
+                id: tr.id,
+                locale: tr.locale,
+                title: tr.title,
+            })),
+        })),
+        educations: educations.map(e => ({
             id: e.id,
+            institutionName: e.institutionName,
             startDate: e.startDate.toISOString(),
-            endDate: e.endDate.toISOString(),
-            contractType: e.contractType,
-            localisation: e.localisation,
-            isVisible: e.isVisible,
+            endDate: iso(e.endDate),
+            logoUrl: e.logoUrl,
             siteUrl: e.siteUrl,
-            imageUrl: e.imageUrl,
+            isVisible: e.isVisible,
             order: e.order,
-            companyName: e.companyName,
-            tagIds: e.tags.map(x => x.id),
             translations: e.translations.map(tr => ({
                 id: tr.id,
                 locale: tr.locale,
-                jobTitle: tr.jobTitle,
+                degree: tr.degree,
                 description: tr.description,
             })),
         })),

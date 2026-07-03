@@ -1,4 +1,4 @@
-import { Locale } from '@prisma/client';
+import { Locale, ProjectNature } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
     IsArray,
@@ -46,11 +46,21 @@ export class CreateProjectDto {
 
     @IsArray()
     @IsString({ each: true })
-    techTagIds: string[];
+    skillIds: string[];
 
     @IsArray()
-    @IsString({ each: true })
-    qualTagIds: string[];
+    @IsEnum(ProjectNature, { each: true })
+    natures: ProjectNature[];
+
+    // Optional cross-links to the blog (« voir les articles » / « lire
+    // l'article »). Independent of each other; both nullable in the schema.
+    @IsOptional()
+    @IsString()
+    blogCategoryId?: string;
+
+    @IsOptional()
+    @IsString()
+    blogArticleId?: string;
 
     @IsArray()
     @ValidateNested({ each: true })

@@ -39,7 +39,7 @@ describe('RevalidationInterceptor', () => {
         const revalidation = { revalidate: jest.fn().mockResolvedValue(undefined) };
         const reflector = {
             getAllAndOverride: jest.fn().mockReturnValue({
-                entity: ['projects', 'skills', 'experiences'],
+                entity: ['projects', 'skills', 'missions'],
                 greeting: false,
             }),
         };
@@ -61,9 +61,9 @@ describe('RevalidationInterceptor', () => {
             'skills',
             'skills:fr',
             'skills:en',
-            'experiences',
-            'experiences:fr',
-            'experiences:en',
+            'missions',
+            'missions:fr',
+            'missions:en',
         ]);
     });
 

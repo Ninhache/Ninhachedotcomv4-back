@@ -25,7 +25,7 @@ const RESERVED = new Set([
 ]);
 
 // v1: an alias change can affect any content, so invalidate everything.
-const CONTENT_ENTITIES = ['projects', 'experiences', 'contacts', 'skills', 'profile'];
+const CONTENT_ENTITIES = ['projects', 'contacts', 'skills', 'profile'];
 
 @Injectable()
 export class AliasAdminService {

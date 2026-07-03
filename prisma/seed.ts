@@ -1,4 +1,4 @@
-import { PrismaClient, TagType, ContractType, Locale, MediaType } from '@prisma/client';
+import { PrismaClient, TagType, Locale, MediaType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,22 +32,6 @@ interface JsonProject {
     sortCategories: string[];
 }
 
-interface JsonExperienceTranslation {
-    type: string;
-    jobtitle: string;
-    description: string;
-}
-
-interface JsonExperience {
-    order: number;
-    title: string;
-    date: string;
-    translations: Record<string, JsonExperienceTranslation>;
-    tags: JsonTag[];
-    link: string;
-    image: string;
-}
-
 interface JsonSkill {
     name: string;
     logo: string;
@@ -59,43 +43,10 @@ interface JsonSkillCategory {
     skills: JsonSkill[];
 }
 
-function parseExperienceDate(dateStr: string): { startDate: Date; endDate: Date } {
-    // Handle formats like "September 2024 - September 2025"
-    // and "June 2022 - August 2022<br>April 2023 - July 2023"
-    const cleaned = dateStr.replace(/<br>/gi, ' - ');
-    const parts = cleaned.split(' - ').map(s => s.trim()).filter(Boolean);
-
-    const parseMonthYear = (s: string): Date => {
-        const d = new Date(s);
-        if (!isNaN(d.getTime())) return d;
-        // fallback
-        return new Date();
-    };
-
-    const startDate = parseMonthYear(parts[0]);
-    const endDate = parseMonthYear(parts[parts.length - 1]);
-
-    return { startDate, endDate };
-}
-
 function parseProjectDate(dateStr: string): Date {
     // Format: "MM/YYYY"
     const [month, year] = dateStr.split('/');
     return new Date(parseInt(year), parseInt(month) - 1, 1);
-}
-
-function mapContractType(typeStr: string): ContractType {
-    const map: Record<string, ContractType> = {
-        'Alternance': ContractType.Workstudy,
-        'Apprenticeship': ContractType.Workstudy,
-        'CDI': ContractType.Permanent,
-        'Permanent contract': ContractType.Permanent,
-        'Stage': ContractType.Internship,
-        'Internship': ContractType.Internship,
-        'Fixed': ContractType.Fixed,
-        'Freelance': ContractType.Freelance,
-    };
-    return map[typeStr] ?? ContractType.Fixed;
 }
 
 async function main() {
@@ -103,14 +54,12 @@ async function main() {
 
     // Clear existing data
     await prisma.projectTranslation.deleteMany();
-    await prisma.experienceTranslation.deleteMany();
     await prisma.skillTranslation.deleteMany();
     await prisma.skillCategoryTranslation.deleteMany();
     await prisma.contactTranslation.deleteMany();
     await prisma.profileTranslation.deleteMany();
     await prisma.media.deleteMany();
     await prisma.project.deleteMany();
-    await prisma.experience.deleteMany();
     await prisma.skill.deleteMany();
     await prisma.skillCategory.deleteMany();
     await prisma.contact.deleteMany();
@@ -120,15 +69,13 @@ async function main() {
     await prisma.tag.deleteMany();
 
     const projects = readJson<JsonProject[]>(path.join(FRONTEND_PATH, 'jsons/projects.json'));
-    const experiences = readJson<JsonExperience[]>(path.join(FRONTEND_PATH, 'jsons/experiences.json'));
     const skillCategories = readJson<JsonSkillCategory[]>(path.join(FRONTEND_PATH, 'jsons/skills.json'));
 
     // ── 1. Tags ────────────────────────────────────────────────────────────────
 
-    // Collect unique tech tag names from projects + experiences
+    // Collect unique tech tag names from projects
     const techTagNames = new Set<string>();
     for (const p of projects) p.tags.forEach(t => techTagNames.add(t.name));
-    for (const e of experiences) e.tags.forEach(t => techTagNames.add(t.name));
 
     // QUAL tags for sortCategories
     const qualTagNames = ['school', 'personal', 'web', 'simulations'];
@@ -262,48 +209,7 @@ async function main() {
 
     console.log(`✅ Created ${projects.length} projects`);
 
-    // ── 4. Experiences ──────────────────────────────────────────────────────────
-
-    for (const e of experiences) {
-        const tagIds = e.tags
-            .map(t => techTagMap.get(t.name))
-            .filter((id): id is string => Boolean(id));
-
-        const { startDate, endDate } = parseExperienceDate(e.date);
-
-        // Determine contract type from fr translation
-        const contractType = mapContractType(e.translations.fr.type);
-
-        await prisma.experience.create({
-            data: {
-                companyName: e.title,
-                startDate,
-                endDate,
-                contractType,
-                localisation: 'France',
-                isVisible: true,
-                siteUrl: e.link !== 'none' ? e.link : null,
-                imageUrl: e.image || null,
-                order: e.order,
-
-                tags: { connect: tagIds.map(id => ({ id })) },
-
-                translations: {
-                    create: (Object.entries(e.translations) as [string, JsonExperienceTranslation][]).map(
-                        ([locale, t]) => ({
-                            locale: locale as Locale,
-                            jobTitle: t.jobtitle,
-                            description: t.description,
-                        })
-                    ),
-                },
-            },
-        });
-    }
-
-    console.log(`✅ Created ${experiences.length} experiences`);
-
-    // ── 5. Contacts ─────────────────────────────────────────────────────────────
+    // ── 4. Contacts ─────────────────────────────────────────────────────────────
 
     const contactsData = [
         {

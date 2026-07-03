@@ -18,7 +18,9 @@ import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 import { SkillService } from './skill.service';
 
-@RevalidateContent('skills')
+// A skill mutation now ripples into project cards and experience/timeline cards
+// (skills are the unified tech-stack entity), so revalidate those tags too.
+@RevalidateContent(['skills', 'projects', 'companies', 'timeline'])
 @Controller('skill')
 export class SkillController {
     constructor(

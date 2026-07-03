@@ -1,5 +1,6 @@
+import { ProjectNature } from '@prisma/client';
 import { Media } from 'src/media/entities/media.entity';
-import { Tag } from 'src/tags/entities/tag.entity';
+import { Skill } from 'src/skill/entities/skill.entity';
 
 export class Project {
   id: string;
@@ -9,7 +10,7 @@ export class Project {
   endDate: Date | null;
   gitUrl?: string;
   visitUrl?: string;
-  techTags: Tag[];
-  qualTags: Tag[];
+  skills: Skill[];
+  natures: ProjectNature[];
   media: Media[];
 }

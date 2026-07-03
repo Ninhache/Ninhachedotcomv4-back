@@ -1,8 +1,6 @@
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
 import { ProfileController } from '../../profile/profile.controller';
-import { FindAllTagsQueryDto } from '../../tags/dto/find-all.dto';
 import { AliasService } from '../alias.service';
+import { isRaw } from '../raw';
 
 const ageBody =
     "return Math.floor((Date.now() - new Date('2002-05-12')) / 3.15576e10);";
@@ -69,11 +67,12 @@ describe('content GET ?raw toggle (acceptance #1/#2)', () => {
     });
 });
 
-describe('FindAllTagsQueryDto raw (acceptance #3)', () => {
-    it('accepts ?raw=true and coerces to boolean (no validation error)', async () => {
-        const dto = plainToInstance(FindAllTagsQueryDto, { raw: 'true' });
-        const errors = await validate(dto);
-        expect(errors).toHaveLength(0);
-        expect(dto.raw).toBe(true);
+describe('isRaw query toggle (acceptance #3)', () => {
+    it('treats only "true"/"1" as raw; everything else resolves', () => {
+        expect(isRaw('true')).toBe(true);
+        expect(isRaw('1')).toBe(true);
+        expect(isRaw('false')).toBe(false);
+        expect(isRaw('')).toBe(false);
+        expect(isRaw(undefined)).toBe(false);
     });
 });

@@ -4,12 +4,20 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+// Blog cross-links are read alongside their translations so the front can
+// render the linked category/article's title without a second round-trip.
+const BLOG_LINK_INCLUDE = {
+    blogCategory: { include: { translations: true } },
+    blogArticle: { include: { translations: true } },
+} as const;
+
 type ProjectWithRelations = Prisma.ProjectGetPayload<{
     include: {
         media: true;
-        techTags: { include: { translations: true } };
-        qualTags: { include: { translations: true } };
+        skills: { include: { translations: true } };
         translations: true;
+        blogCategory: { include: { translations: true } };
+        blogArticle: { include: { translations: true } };
     };
 }>;
 
@@ -18,17 +26,18 @@ export class ProjectService {
     constructor(private prismaService: PrismaService) {}
 
     private toDTO(project: ProjectWithRelations) {
-        const { media, techTags, qualTags, startDate, endDate, ...rest } =
-            project;
+        const { media, skills, startDate, endDate, ...rest } = project;
         return {
             ...rest,
             startDate: startDate.toISOString(),
             endDate: endDate ? endDate.toISOString() : null,
             medias: media,
-            techTagIds: techTags.map(t => t.id),
-            qualTagIds: qualTags.map(t => t.id),
-            techTags,
-            qualTags,
+            // Write side accepts ids; read side returns full objects. `natures`
+            // is a scalar enum array carried through `...rest`. `blogCategory`/
+            // `blogArticle` (+ their *Id scalars) are likewise carried through
+            // `...rest` since they're part of the queried payload.
+            skillIds: skills.map(s => s.id),
+            skills,
         };
     }
 
@@ -36,8 +45,8 @@ export class ProjectService {
         const {
             startDate,
             endDate,
-            qualTagIds,
-            techTagIds,
+            natures,
+            skillIds,
             gitUrl,
             mediaIds,
             visitUrl,
@@ -45,6 +54,8 @@ export class ProjectService {
             logoUrl,
             translations,
             isVisible,
+            blogCategoryId,
+            blogArticleId,
         } = createProjectDto;
 
         const project = await this.prismaService.project.create({
@@ -57,15 +68,20 @@ export class ProjectService {
                 logoUrl: logoUrl ?? null,
                 isVisible,
 
-                qualTags: {
-                    connect: (qualTagIds ?? []).map(id => ({ id })),
-                },
-                techTags: {
-                    connect: (techTagIds ?? []).map(id => ({ id })),
+                natures: natures ?? [],
+                skills: {
+                    connect: (skillIds ?? []).map(id => ({ id })),
                 },
 
                 media: mediaIds?.length
                     ? { connect: mediaIds.map(id => ({ id })) }
+                    : undefined,
+
+                blogCategory: blogCategoryId
+                    ? { connect: { id: blogCategoryId } }
+                    : undefined,
+                blogArticle: blogArticleId
+                    ? { connect: { id: blogArticleId } }
                     : undefined,
 
                 translations: translations?.length
@@ -81,9 +97,9 @@ export class ProjectService {
             },
             include: {
                 media: true,
-                qualTags: { include: { translations: true } },
-                techTags: { include: { translations: true } },
+                skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
@@ -94,9 +110,9 @@ export class ProjectService {
         const projects = await this.prismaService.project.findMany({
             include: {
                 media: true,
-                qualTags: { include: { translations: true } },
-                techTags: { include: { translations: true } },
+                skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
             orderBy: { startDate: 'desc' },
         });
@@ -109,9 +125,9 @@ export class ProjectService {
             where: { id },
             include: {
                 media: true,
-                qualTags: { include: { translations: true } },
-                techTags: { include: { translations: true } },
+                skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
@@ -152,23 +168,36 @@ export class ProjectService {
                       }
                     : undefined,
 
-                techTags: dto.techTagIds
-                    ? { set: dto.techTagIds.map(id => ({ id })) }
+                skills: dto.skillIds
+                    ? { set: dto.skillIds.map(id => ({ id })) }
                     : undefined,
-                qualTags: dto.qualTagIds
-                    ? { set: dto.qualTagIds.map(id => ({ id })) }
-                    : undefined,
+                natures: dto.natures !== undefined ? dto.natures : undefined,
 
                 media:
                     dto.mediaIds !== undefined
                         ? { set: dto.mediaIds.map(id => ({ id })) }
                         : undefined,
+
+                // 3-state: omitted → leave unchanged; empty string/undefined
+                // handled by the `?` check → clear the link; an id → connect.
+                blogCategory:
+                    dto.blogCategoryId === undefined
+                        ? undefined
+                        : dto.blogCategoryId
+                          ? { connect: { id: dto.blogCategoryId } }
+                          : { disconnect: true },
+                blogArticle:
+                    dto.blogArticleId === undefined
+                        ? undefined
+                        : dto.blogArticleId
+                          ? { connect: { id: dto.blogArticleId } }
+                          : { disconnect: true },
             },
             include: {
                 media: true,
-                qualTags: { include: { translations: true } },
-                techTags: { include: { translations: true } },
+                skills: { include: { translations: true } },
                 translations: true,
+                ...BLOG_LINK_INCLUDE,
             },
         });
 
