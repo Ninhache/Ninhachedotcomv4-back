@@ -232,14 +232,17 @@ ${lines.join('\n')}
 function renderEducation(data: CvData): string {
     if (!data.education.length) return '';
     const blocks = data.education
-        .map(
-            ed =>
-                `    \\resumeSubheading{${e(ed.institution)}}{${range(
-                    ed.startDate,
-                    ed.endDate,
-                    data.locale
-                )}}{${e(ed.degree)}}{}`
-        )
+        .map(ed => {
+            const heading = `    \\resumeSubheading{${e(ed.institution)}}{${range(
+                ed.startDate,
+                ed.endDate,
+                data.locale
+            )}}{${e(ed.degree)}}{}`;
+            // Optional coursework/description line, rendered as a list item so
+            // it matches the experience blocks (was degree-only before).
+            const desc = ed.description ? `\n${itemList([ed.description])}` : '';
+            return `${heading}${desc}`;
+        })
         .join('\n    \\vspace{5pt}\n');
     return `\\section{${SECTION[data.locale].education}}
   \\resumeSubHeadingListStart
