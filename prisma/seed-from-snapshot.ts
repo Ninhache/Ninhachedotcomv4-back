@@ -23,7 +23,13 @@ type Tr = Record<string, unknown> & { id: string; locale: string };
 const ids = (xs: string[] = []) => xs.map(id => ({ id }));
 const date = (s: string | null | undefined) => (s ? new Date(s) : null);
 
-async function main() {
+/**
+ * @param opts.skip Snapshot keys to leave untouched. Used by promote-snapshot.ts
+ *   for tables it deliberately preserves: those rows must be neither truncated
+ *   nor rewritten, otherwise the upsert would put back what the truncate spared.
+ */
+async function main(opts: { skip?: string[] } = {}) {
+    const skip = opts.skip ?? [];
     const snapshot = JSON.parse(
         readFileSync(join(__dirname, 'snapshot.json'), 'utf8')
     );
@@ -429,17 +435,21 @@ async function main() {
     }
 
     // 11. Resume ------------------------------------------------------------
-    for (const r of snapshot.resumes ?? []) {
-        const translations = r.translations.map((tr: Tr) => ({
-            id: tr.id,
-            locale: tr.locale,
-            url: tr.url,
-        }));
-        await prisma.resume.upsert({
-            where: { id: r.id },
-            create: { id: r.id, translations: { create: translations } },
-            update: { translations: { deleteMany: {}, create: translations } },
-        });
+    if (!skip.includes('resumes')) {
+        for (const r of snapshot.resumes ?? []) {
+            const translations = r.translations.map((tr: Tr) => ({
+                id: tr.id,
+                locale: tr.locale,
+                url: tr.url,
+            }));
+            await prisma.resume.upsert({
+                where: { id: r.id },
+                create: { id: r.id, translations: { create: translations } },
+                update: {
+                    translations: { deleteMany: {}, create: translations },
+                },
+            });
+        }
     }
 
     // 12. Aliases (no deps) -------------------------------------------------
@@ -472,7 +482,11 @@ async function main() {
         'resumes',
         'aliases',
     ]
-        .map(k => `${(snapshot[k] ?? []).length} ${k}`)
+        .map(k =>
+            skip.includes(k)
+                ? `${k} skipped`
+                : `${(snapshot[k] ?? []).length} ${k}`
+        )
         .join(', ');
     console.log(`✅ Restored from snapshot: ${total}`);
 }
