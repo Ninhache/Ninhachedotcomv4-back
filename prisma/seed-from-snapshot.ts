@@ -477,11 +477,20 @@ async function main() {
     console.log(`✅ Restored from snapshot: ${total}`);
 }
 
-main()
-    .catch(e => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+/**
+ * Replays the snapshot into the DB. Exported so `promote-snapshot.ts` can run it
+ * right after its TRUNCATE, in the same process, without shelling out.
+ */
+export { main as restoreFromSnapshot };
+
+// Only self-run when invoked directly (`yarn db:restore`), not when imported.
+if (require.main === module) {
+    main()
+        .catch(e => {
+            console.error(e);
+            process.exit(1);
+        })
+        .finally(async () => {
+            await prisma.$disconnect();
+        });
+}
