@@ -13,6 +13,9 @@
  *                   POST /auth/register, and is not in the snapshot.
  *   - `CvConfig`  — local tooling state whose generated*Url fields point at
  *                   physical uploads/ PDFs the snapshot never captures.
+ *   - `Resume`    — the published CV, same reason: its url points at a PDF that
+ *                   never travels with the snapshot, and each environment
+ *                   publishes its own from the back-office generator.
  *   - `_prisma_migrations` — schema history; owned by `prisma migrate deploy`.
  *
  * The truncate list is derived from the live database, not hardcoded, so a new
@@ -29,14 +32,30 @@
  *   4. yarn db:promote --yes
  */
 import { PrismaClient } from '@prisma/client';
-import { readdirSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readdirSync, readFileSync } from 'fs';
+import { basename, join } from 'path';
 import { restoreFromSnapshot } from './seed-from-snapshot';
 
 const prisma = new PrismaClient();
 
 /** Tables whose contents are environment-owned, not snapshot-owned. */
-const PRESERVED = ['User', 'CvConfig', '_prisma_migrations'];
+const PRESERVED = [
+    'User',
+    'CvConfig',
+    // The published CV: its url points at a physical uploads/ PDF that the
+    // snapshot never captures, and each environment generates its own from the
+    // back-office. Promoting the row without the file would 404 the download.
+    'Resume',
+    'ResumeTranslation',
+    '_prisma_migrations',
+];
+
+/**
+ * Snapshot keys whose rows are never written, because their table is preserved.
+ * Passed to the restore so it skips them too, and excluded from the uploads
+ * pre-flight below since those references are never followed.
+ */
+const SKIPPED_KEYS = ['resumes'];
 
 /** Snapshot keys that carry content rows, used only for the pre-run summary. */
 const CONTENT_KEYS = [
@@ -92,6 +111,36 @@ async function contentTables(): Promise<string[]> {
     return rows.map(r => r.tablename).filter(t => !PRESERVED.includes(t));
 }
 
+/**
+ * Fails fast when the snapshot references an uploads/ file this host does not
+ * have.
+ *
+ * The snapshot carries the rows that point at media, never the bytes: those
+ * travel through git (most of uploads/ is committed) or a manual copy. A row
+ * restored without its file yields a broken image or a 404 download, and the
+ * damage is only visible once the truncate is already done. References owned by
+ * a preserved table are ignored, since those rows are not rewritten.
+ */
+function assertUploadsPresent(snapshot: Record<string, unknown>) {
+    const scanned = Object.keys(snapshot)
+        .filter(k => k !== '_meta' && !SKIPPED_KEYS.includes(k))
+        .map(k => JSON.stringify(snapshot[k]))
+        .join('');
+
+    const found: string[] = scanned.match(/\/uploads\/[A-Za-z0-9._-]+/g) ?? [];
+    const refs = found.filter((r, i) => found.indexOf(r) === i);
+    const dir = join(__dirname, '..', 'uploads');
+    const missing = refs.filter(r => !existsSync(join(dir, basename(r))));
+
+    if (missing.length > 0) {
+        throw new Error(
+            `${missing.length} file(s) referenced by the snapshot are absent from uploads/:\n` +
+                missing.map(r => `  - ${r}`).join('\n') +
+                '\nCopy them over first, or re-run with --allow-missing-uploads to accept broken links.'
+        );
+    }
+}
+
 async function main() {
     const confirmed = process.argv.includes('--yes');
 
@@ -102,6 +151,9 @@ async function main() {
         k => `${(snapshot[k] ?? []).length} ${k}`
     ).join(', ');
 
+    if (!process.argv.includes('--allow-missing-uploads')) {
+        assertUploadsPresent(snapshot);
+    }
     await assertMigrationsApplied();
 
     const tables = await contentTables();
@@ -128,7 +180,7 @@ async function main() {
     );
     console.log(`🗑️  Truncated ${tables.length} table(s)`);
 
-    await restoreFromSnapshot();
+    await restoreFromSnapshot({ skip: SKIPPED_KEYS });
 
     const kept = await prisma.user.count();
     console.log(`👤 ${kept} user row(s) preserved`);
