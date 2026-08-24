@@ -47,6 +47,23 @@ export class ArticleController {
         return this.articleService.findAllAdmin();
     }
 
+    /**
+     * Private review link. `@Public()` on purpose: the token in the URL *is*
+     * the credential, and this is the only route that will serve a draft.
+     * Two segments, so it cannot collide with the one-segment `:slug` below.
+     */
+    @Public()
+    @Get('preview/:token')
+    async findOneByPreviewToken(
+        @Param('token') token: string,
+        @Query() query: FindAllArticlesQueryDto
+    ) {
+        const article = await this.articleService.findOneByPreviewToken(token);
+        return query.raw
+            ? article
+            : this.alias.resolveObject(article, query.locale ?? 'fr');
+    }
+
     @Public()
     @Get(':slug')
     async findOne(
@@ -70,6 +87,23 @@ export class ArticleController {
     }
 
     // No dedicated visibility route: the admin PATCHes {isVisible} here.
+    /**
+     * Issues or rotates the review link, returning `{ previewToken }`. This and
+     * the DELETE below trip the class-level `@RevalidateContent('articles')`:
+     * the extra tag bust is useless but harmless, and not worth an opt-out
+     * mechanism for two rare clicks.
+     */
+    @Post(':id/preview-token')
+    issuePreviewToken(@Param('id') id: string) {
+        return this.articleService.issuePreviewToken(id);
+    }
+
+    /** Revokes the review link; the shared URL 404s from then on. */
+    @Delete(':id/preview-token')
+    revokePreviewToken(@Param('id') id: string) {
+        return this.articleService.revokePreviewToken(id);
+    }
+
     @Patch(':id')
     update(@Param('id') id: string, @Body() dto: UpdateArticleDto) {
         return this.articleService.update(id, dto);

@@ -203,6 +203,11 @@ model Article {
   slug           String               @unique
   isVisible      Boolean              @default(false)
   publishedAt    DateTime?
+  // Private review link. Non-null = the article is reachable at
+  // /blog/preview/<token> whatever isVisible says, so a draft can be sent out
+  // for validation before it goes public. Orthogonal to isVisible; rotating or
+  // clearing it revokes the link immediately. Never leaves a public endpoint.
+  previewToken   String?              @unique
   coverImageUrl  String? // plain /uploads/... path or external URL (like Mission.imageUrl)
   tags           String[] // freeform metadata tags
   order          Int                  @default(0)
