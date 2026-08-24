@@ -140,6 +140,9 @@ async function main() {
             slug: a.slug,
             isVisible: a.isVisible,
             publishedAt: iso(a.publishedAt),
+            // Carried over so a review link shared before a promotion still
+            // resolves against the promoted database.
+            previewToken: a.previewToken,
             coverImageUrl: a.coverImageUrl,
             tags: a.tags,
             order: a.order,

@@ -130,6 +130,7 @@ async function main() {
             slug: a.slug,
             isVisible: a.isVisible,
             publishedAt: date(a.publishedAt),
+            previewToken: a.previewToken ?? null,
             coverImageUrl: a.coverImageUrl ?? null,
             order: a.order ?? 0,
         };

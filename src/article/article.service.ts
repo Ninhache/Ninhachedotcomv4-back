@@ -4,6 +4,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -11,6 +12,10 @@ import { UpdateArticleDto } from './dto/update-article.dto';
 // Prisma's error code for a unique-constraint violation — thrown here when
 // `slug` collides with an existing article.
 const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
+
+// Entropy of a private review link. 24 random bytes (192 bits) is far past
+// guessable and base64url-encodes to a 32-char URL-safe segment.
+const PREVIEW_TOKEN_BYTES = 24;
 
 // Categories (with their translations) are flattened out of the join table
 // by toDTO; article translations are returned as-is.
@@ -27,10 +32,13 @@ export class ArticleService {
 
     // Flatten the join rows back to a plain `categories[]` array (mirrors
     // SkillService.skillToDTO).
-    private toDTO(article: any) {
-        const { categoryLinks, ...rest } = article;
+    // `previewToken` is a credential, so it is dropped unless the caller is an
+    // authenticated admin path that has to display the link back.
+    private toDTO(article: any, opts: { withPreviewToken?: boolean } = {}) {
+        const { categoryLinks, previewToken, ...rest } = article;
         return {
             ...rest,
+            ...(opts.withPreviewToken ? { previewToken } : {}),
             categories: (categoryLinks ?? []).map((l: any) => l.category),
         };
     }
@@ -103,7 +111,7 @@ export class ArticleService {
                     where: { id: created.id },
                     include: ARTICLE_INCLUDE,
                 });
-                return this.toDTO(full);
+                return this.toDTO(full, { withPreviewToken: true });
             });
         } catch (error) {
             throw this.mapSlugConflict(error);
@@ -132,7 +140,7 @@ export class ArticleService {
             orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
             include: ARTICLE_INCLUDE,
         });
-        return articles.map(a => this.toDTO(a));
+        return articles.map(a => this.toDTO(a, { withPreviewToken: true }));
     }
 
     /** Public single-article read. A draft or unknown slug both 404. */
@@ -145,6 +153,49 @@ export class ArticleService {
             throw new NotFoundException(`Article with slug [${slug}] not found`);
         }
         return this.toDTO(article);
+    }
+
+    /**
+     * Private review read: resolves an article by its preview token and
+     * deliberately ignores `isVisible`, so a draft can be proofread at a
+     * shareable URL before it is published. The token is the only credential,
+     * so an unknown one is an ordinary 404 with no hint it ever existed.
+     */
+    async findOneByPreviewToken(token: string) {
+        const article = await this.prismaService.article.findFirst({
+            where: { previewToken: token },
+            include: ARTICLE_INCLUDE,
+        });
+        if (!article) {
+            throw new NotFoundException('Preview link not found');
+        }
+        return this.toDTO(article);
+    }
+
+    /**
+     * Issues (or rotates) an article's private review link. Rotation is the
+     * point: writing a fresh token invalidates the previously shared URL from
+     * the next request on. Returns the token alone, never a full article.
+     */
+    async issuePreviewToken(id: string) {
+        await this.findOneOrThrow(id);
+        const previewToken =
+            randomBytes(PREVIEW_TOKEN_BYTES).toString('base64url');
+        await this.prismaService.article.update({
+            where: { id },
+            data: { previewToken },
+        });
+        return { previewToken };
+    }
+
+    /** Revokes the review link: the shared URL 404s from the next request on. */
+    async revokePreviewToken(id: string) {
+        await this.findOneOrThrow(id);
+        await this.prismaService.article.update({
+            where: { id },
+            data: { previewToken: null },
+        });
+        return { previewToken: null };
     }
 
     /**
@@ -197,7 +248,7 @@ export class ArticleService {
                     where: { id },
                     include: ARTICLE_INCLUDE,
                 });
-                return this.toDTO(full);
+                return this.toDTO(full, { withPreviewToken: true });
             });
         } catch (error) {
             throw this.mapSlugConflict(error);
